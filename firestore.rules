@@ -1,0 +1,136 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'saifysamit@gmail.com' ||
+        request.auth.token.email.lower() == 'splendourstreetwear@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidProduct(p) {
+      return p.id is string && p.id.size() <= 128 &&
+             p.name is string && p.name.size() > 0 && p.name.size() <= 200 &&
+             p.price is number && p.price >= 0 &&
+             p.image is string && p.image.size() <= 2048 &&
+             p.stock is number && p.stock >= 0 &&
+             p.category is string && p.category.size() <= 100;
+    }
+
+    function isValidOrder(o) {
+      return o.id is string && o.id.size() <= 128 &&
+             o.userId is string && (o.userId == request.auth.uid || o.userId == 'guest') &&
+             o.customerEmail is string && o.customerEmail.size() > 0 &&
+             o.total is number && o.total >= 0 &&
+             o.deliveryCharge is number && o.deliveryCharge >= 0 &&
+             o.shippingRegion in ['INSIDE_DHAKA', 'OUTSIDE_DHAKA', 'INTERNATIONAL'] &&
+             o.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] &&
+             o.paymentMethod in ['COD', 'bkash'] &&
+             o.items is list && o.items.size() > 0 && o.items.size() <= 100 &&
+             (!o.keys().contains('paymentDetails') || (o.paymentMethod == 'bkash' && o.paymentDetails is map));
+    }
+
+    function isValidReview(r) {
+      return r.id is string && r.id.size() <= 128 &&
+             r.productId is string && r.productId.size() <= 128 &&
+             r.userName is string && r.userName.size() > 0 && r.userName.size() <= 100 &&
+             r.text is string && r.text.size() > 0 && r.text.size() <= 2000 &&
+             r.rating is number && r.rating >= 1 && r.rating <= 5 &&
+             r.likes is number && r.likes >= 0 &&
+             r.dislikes is number && r.dislikes >= 0 &&
+             (!r.keys().contains('images') || (r.images is list && r.images.size() <= 4));
+    }
+
+    function isValidSiteConfig(sc) {
+      return sc.logoText is string && sc.logoText.size() <= 100 &&
+             sc.isChatbotEnabled is bool &&
+             (!sc.keys().contains('storyVideos') || sc.storyVideos is map);
+    }
+
+    function isValidMessage(m) {
+      return m.name is string && m.name.size() > 0 && m.name.size() <= 100 &&
+             m.email is string && m.email.size() > 0 && m.email.size() <= 200 &&
+             m.subject is string && m.subject.size() <= 200 &&
+             m.message is string && m.message.size() > 0 && m.message.size() <= 2000 &&
+             m.status in ['new', 'read', 'archived'] &&
+             (!m.keys().contains('createdAt') || m.createdAt is timestamp);
+    }
+
+    // --- Collection Routes ---
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) && incoming().id == productId;
+      allow update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow get: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId == 'guest');
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if (isSignedIn() || incoming().userId == 'guest') && isValidId(orderId) && isValidOrder(incoming()) && incoming().id == orderId;
+      allow update: if isAdmin() || (
+        isSignedIn() && isOwner(existing().userId) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+        incoming().status == 'cancelled' && existing().status == 'pending'
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(commentId) && isValidReview(incoming()) && incoming().id == commentId;
+      allow update: if (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'dislikes'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /metadata/siteConfig {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSiteConfig(incoming());
+    }
+
+    match /messages/{messageId} {
+      allow create: if isValidMessage(incoming());
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      allow write: if isAdmin();
+    }
+  }
+}

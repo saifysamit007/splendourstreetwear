@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A garment or item listed in the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "image": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "tag": { "type": "string" },
+        "category": { "type": "string" },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "colors": { "type": "array", "items": { "type": "string" } },
+        "stock": { "type": "number" }
+      },
+      "required": ["id", "name", "price", "image", "description", "category", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer purchase order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "shippingAddress": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "deliveryCharge": { "type": "number" },
+        "shippingRegion": { "type": "string", "enum": ["INSIDE_DHAKA", "OUTSIDE_DHAKA", "INTERNATIONAL"] },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "createdAt": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["COD", "bkash"] }
+      },
+      "required": ["id", "customerEmail", "items", "total", "status", "createdAt", "invoiceId", "paymentMethod"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User review and photo feedback on a product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "rating": { "type": "number" },
+        "likes": { "type": "number" },
+        "dislikes": { "type": "number" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "productId", "userName", "text", "rating", "likes", "dislikes", "createdAt"]
+    },
+    "SiteConfig": {
+      "title": "SiteConfig",
+      "description": "Global configuration for the website",
+      "type": "object",
+      "properties": {
+        "logoText": { "type": "string" },
+        "navbarLinks": { "type": "array" },
+        "footer": { "type": "object" },
+        "invoice": { "type": "object" },
+        "isChatbotEnabled": { "type": "boolean" },
+        "storyVideos": { "type": "object" }
+      },
+      "required": ["logoText", "navbarLinks", "footer", "invoice", "isChatbotEnabled"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store products"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    },
+    "/comments/{commentId}": {
+      "schema": "Review",
+      "description": "Product reviews with ratings and photos"
+    },
+    "/metadata/siteConfig": {
+      "schema": "SiteConfig",
+      "description": "Global site configuration"
+    },
+    "/admins/{adminId}": {
+      "schema": "object",
+      "description": "Administrator user records"
+    }
+  }
+}

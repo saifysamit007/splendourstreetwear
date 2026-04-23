@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="description" content="SPLENDOUR | Premium Streetwear Architecture. Defined by culture, crafted for luxury. High-end urban apparel from the heart of Dhaka." />
+    
+    <!-- Privacy & Security -->
+    <meta name="referrer" content="no-referrer" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>S</text></svg>" />
+
+    <!-- Performance Hints -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://picsum.photos" />
+    
+    <title>SPLENDOUR | Premium Streetwear Architecture</title>
+    <script>
+      // Early suppression of benign Vite HMR errors
+      (function() {
+        var suppress = function(e) {
+          var msg = (e.reason ? (e.reason.message || e.reason) : (e.message || '')).toString();
+          if (msg.includes('WebSocket') || msg.includes('vite') || msg.includes('HMR') || msg.includes('closed without opened')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return true;
+          }
+        };
+        window.addEventListener('unhandledrejection', suppress);
+        window.addEventListener('error', suppress, true);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
