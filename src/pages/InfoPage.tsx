@@ -1,6 +1,6 @@
 import { db } from '../firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -116,7 +116,16 @@ function ProductCard({ product }: { product: Product }) {
         >
           {product.name}
         </h3>
-        <p className="text-brand-muted font-mono text-sm">{formatPrice(product.price)}</p>
+        <div className="flex items-center gap-3">
+          {product.discountPrice ? (
+            <>
+              <p className="text-brand-red font-black font-mono text-sm">{formatPrice(product.discountPrice)}</p>
+              <p className="text-brand-muted font-medium font-mono text-[10px] line-through opacity-50">{formatPrice(product.price)}</p>
+            </>
+          ) : (
+            <p className="text-brand-muted font-mono text-sm">{formatPrice(product.price)}</p>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -237,7 +246,9 @@ function ContactForm() {
 
 export default function InfoPage() {
   const navigate = useNavigate();
-  const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
+  const { slug: paramSlug } = useParams<{ slug: string }>();
+  const slug = paramSlug || (location.pathname === '/shop' ? 'shop' : '');
   const [searchParams] = useSearchParams();
   const { products, siteConfig, searchQuery } = useStore();
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'All');
@@ -369,10 +380,10 @@ export default function InfoPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
           {(siteConfig.collections || [
-            { name: "Essential Loop", tag: "CORE", image: "https://picsum.photos/seed/coll1/1200/800", desc: "Minimalist silhouettes for everyday utility. Engineered for efficiency.", year: "2026", link: "/info/shop" },
-            { name: "Cyber Drifter", tag: "LIMITED", image: "https://picsum.photos/seed/coll2/1200/800", desc: "Technical fabrics adapted for the chaos of the city. Industrial aesthetics.", year: "2026", link: "/info/shop" },
-            { name: "Splendour Origins", tag: "ARCHIVE", image: "https://picsum.photos/seed/coll3/1200/800", desc: "The foundational drop that started the culture. A study in raw form.", year: "2020", link: "/info/shop" },
-            { name: "Dhaka Nights", tag: "NEW", image: "https://picsum.photos/seed/coll4/1200/800", desc: "Reflective detailing inspired by the city after dark. High visibility.", year: "2025", link: "/info/shop" }
+            { name: "Essential Loop", tag: "CORE", image: "https://picsum.photos/seed/coll1/1200/800", desc: "Minimalist silhouettes for everyday utility. Engineered for efficiency.", year: "2026", link: "/shop" },
+            { name: "Cyber Drifter", tag: "LIMITED", image: "https://picsum.photos/seed/coll2/1200/800", desc: "Technical fabrics adapted for the chaos of the city. Industrial aesthetics.", year: "2026", link: "/shop" },
+            { name: "Splendour Origins", tag: "ARCHIVE", image: "https://picsum.photos/seed/coll3/1200/800", desc: "The foundational drop that started the culture. A study in raw form.", year: "2020", link: "/shop" },
+            { name: "Dhaka Nights", tag: "NEW", image: "https://picsum.photos/seed/coll4/1200/800", desc: "Reflective detailing inspired by the city after dark. High visibility.", year: "2025", link: "/shop" }
           ]).map((col, i) => (
             <motion.div 
               key={i}
@@ -384,7 +395,7 @@ export default function InfoPage() {
                 "group cursor-pointer flex flex-col",
                 i % 2 === 1 ? "md:mt-24" : ""
               )}
-              onClick={() => navigate(col.link || '/info/shop')}
+              onClick={() => navigate(col.link || '/shop')}
             >
               <div className="relative aspect-[4/5] rounded-[48px] overflow-hidden bg-brand-card mb-8 border border-white/5">
                 {col.video ? (

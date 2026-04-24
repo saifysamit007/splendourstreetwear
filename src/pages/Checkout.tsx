@@ -22,11 +22,14 @@ type Step = 'shipping' | 'payment' | 'confirmation';
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { cart, clearCart, addOrder, products, updateProduct, siteConfig } = useStore();
+  const { cart, clearCart, addOrder, products, updateProduct, siteConfig, coupons, addNotification } = useStore();
   const [currentStep, setCurrentStep] = useState<Step>('shipping');
   const [loading, setLoading] = useState(false);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [copied, setCopied] = useState(false);
+  
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   
   // Form State
   const [shippingInfo, setShippingInfo] = useState({
@@ -48,9 +51,77 @@ export default function Checkout() {
 
   const [isBKashModalOpen, setIsBKashModalOpen] = useState(false);
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => {
+    const price = item.discountPrice || item.price;
+    return sum + price * item.quantity;
+  }, 0);
+
+  const handleApplyCoupon = () => {
+    if (!couponCode.trim()) return;
+    
+    const coupon = coupons.find(c => c.code.toUpperCase() === couponCode.trim().toUpperCase());
+    
+    if (!coupon) {
+      addNotification('Invalid coupon code', 'error');
+      return;
+    }
+
+    if (!coupon.isActive) {
+      addNotification('This coupon is no longer active', 'error');
+      return;
+    }
+
+    if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
+      addNotification('This coupon has expired', 'error');
+      return;
+    }
+
+    if (coupon.minPurchase && subtotal < coupon.minPurchase) {
+      addNotification(`Minimum purchase of ${formatPrice(coupon.minPurchase)} required`, 'error');
+      return;
+    }
+
+    if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+      addNotification('Coupon usage limit reached', 'error');
+      return;
+    }
+
+    // Product Specificity Check
+    if (coupon.applicableProductIds && coupon.applicableProductIds.length > 0) {
+      const hasEligibleProduct = cart.some(item => coupon.applicableProductIds?.includes(item.id));
+      if (!hasEligibleProduct) {
+        addNotification('This coupon is not applicable to any items in your cart', 'error');
+        return;
+      }
+    }
+
+    setAppliedCoupon(coupon);
+    addNotification('Coupon applied successfully', 'success');
+  };
+
+  const getCouponDiscount = () => {
+    if (!appliedCoupon) return 0;
+
+    let subtotalToDiscount = subtotal;
+    
+    if (appliedCoupon.applicableProductIds && appliedCoupon.applicableProductIds.length > 0) {
+      subtotalToDiscount = cart
+        .filter(item => appliedCoupon.applicableProductIds.includes(item.id))
+        .reduce((sum, item) => sum + (item.discountPrice || item.price) * item.quantity, 0);
+    }
+
+    if (appliedCoupon.discountType === 'percentage') {
+      return (subtotalToDiscount * appliedCoupon.discountAmount) / 100;
+    } else {
+      // Fixed discount capped at the eligible subtotal
+      return Math.min(appliedCoupon.discountAmount, subtotalToDiscount);
+    }
+  };
+
+  const couponDiscount = getCouponDiscount();
+
   const deliveryCharge = SHIPPING_REGIONS.find(r => r.id === shippingInfo.shippingRegion)?.rate || 0;
-  const total = subtotal + deliveryCharge;
+  const total = Math.max(0, subtotal - couponDiscount + deliveryCharge);
 
   useEffect(() => {
     if (cart.length === 0 && currentStep !== 'confirmation') {
@@ -64,8 +135,10 @@ export default function Checkout() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePlaceOrder = async () => {
-    if (paymentMethod === 'bkash' && !bkashDetails.transactionId) {
+  const handlePlaceOrder = async (directDetails?: typeof bkashDetails) => {
+    const finalBkashDetails = directDetails || bkashDetails;
+    
+    if (paymentMethod === 'bkash' && !finalBkashDetails.transactionId) {
       setIsBKashModalOpen(true);
       return;
     }
@@ -88,9 +161,13 @@ export default function Checkout() {
       items: cart.map(item => ({
         id: item.id,
         name: item.name,
-        price: item.price,
+        price: item.discountPrice || item.price,
+        originalPrice: item.price,
         quantity: item.quantity
       })),
+      subtotal: subtotal,
+      couponDiscount: couponDiscount,
+      couponCode: appliedCoupon?.code,
       total: total,
       deliveryCharge: deliveryCharge,
       shippingRegion: shippingInfo.shippingRegion,
@@ -98,7 +175,7 @@ export default function Checkout() {
       createdAt: new Date().toISOString(),
       invoiceId: `${siteConfig.invoice.prefix}${Math.floor(1000 + Math.random() * 9000)}`,
       paymentMethod: paymentMethod,
-      paymentDetails: paymentMethod === 'bkash' ? bkashDetails : undefined
+      paymentDetails: paymentMethod === 'bkash' ? finalBkashDetails : undefined
     };
 
     // Update stock levels
@@ -138,6 +215,8 @@ export default function Checkout() {
             <h1 className="text-3xl md:text-5xl font-display font-black italic uppercase tracking-tighter mb-4">Transmission Successful</h1>
             <p className="text-brand-muted text-sm md:text-lg leading-relaxed mb-12 max-w-xl mx-auto">
               Your architectural order <span className="text-white font-mono font-bold">#{lastOrder.id}</span> has been logged in the collective registry.
+              <br /><br />
+              আমরা আপনার অর্ডারটি পেয়েছি এবং বর্তমানে এটি <span className="text-brand-red font-bold">Pending</span> অবস্থায় আছে। আমাদের টিম এটি রিভিউ করার পর, আপনার দেয়া ফোন নাম্বারে (<span className="text-white font-bold">{lastOrder.customerPhone}</span>) কল করে অর্ডারটি কনফার্ম করবে।
             </p>
 
             <div className="bg-black/20 rounded-[32px] md:rounded-[40px] p-6 md:p-8 mb-12 text-left">
@@ -466,11 +545,51 @@ export default function Checkout() {
                  ))}
               </div>
 
+              <div className="mb-8 p-4 bg-white/5 border border-white/5 rounded-2xl">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="COUPON CODE"
+                    className="flex-grow bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[10px] font-bold uppercase tracking-widest focus:border-brand-red outline-none transition-all"
+                  />
+                  <button 
+                    onClick={handleApplyCoupon}
+                    className="px-4 py-3 bg-brand-red text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-lg shadow-brand-red/20"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {appliedCoupon && (
+                  <div className="mt-3 flex items-center justify-between px-2">
+                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">
+                      Applied: {appliedCoupon.code}
+                    </span>
+                    <button 
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setCouponCode('');
+                      }} 
+                      className="text-[10px] text-brand-muted hover:text-brand-red transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4 pt-4 border-t border-white/5">
                  <div className="flex justify-between text-sm">
                     <span className="text-brand-muted">Market Asset Total</span>
                     <span className="font-mono font-bold">{formatPrice(subtotal)}</span>
                  </div>
+                 {appliedCoupon && (
+                   <div className="flex justify-between text-sm text-green-500">
+                      <span>Architectural Discount</span>
+                      <span className="font-mono font-bold">-{formatPrice(couponDiscount)}</span>
+                   </div>
+                 )}
                  <div className="flex justify-between text-sm">
                     <span className="text-brand-muted">Logistics Fee</span>
                     <span className="text-white font-mono font-bold tracking-widest text-xs">{formatPrice(deliveryCharge)}</span>
@@ -501,8 +620,8 @@ export default function Checkout() {
         onSuccess={(details) => {
           setBkashDetails(details);
           setIsBKashModalOpen(false);
-          // Wait a second for modal to close then place order
-          setTimeout(() => handlePlaceOrder(), 500);
+          // Directly pass details to avoid state race
+          handlePlaceOrder(details);
         }}
       />
     </div>

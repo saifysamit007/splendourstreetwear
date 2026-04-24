@@ -1,0 +1,21 @@
+516:            {/* Collections Section */}
+517-            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+518-                <div className="flex items-center justify-between mb-12">
+519-                   <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red flex items-center gap-4">
+520-                      <LayoutGrid size={24} /> Collections Gallery Configuration
+521-                   </h3>
+522-                   <button 
+523-                      onClick={() => {
+524-                        const newCols = [...(tempSiteConfig.collections || [])];
+525-                        newCols.push({ name: '', tag: '', image: '', video: '', desc: '', year: (new Date().getFullYear().toString()), link: '/info/shop' });
+526-                        setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+527-                      }}
+528-                      className="bg-brand-red text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full flex items-center gap-2 hover:bg-brand-accent-dark transition-all"
+529-                   >
+530-                      <PlusCircle size={16} /> Add Collection
+531-                   </button>
+532-                </div>
+533-               <div className="space-y-8">
+534-                  {(tempSiteConfig.collections || []).map((col: any, idx: number) => (
+535-                    <div key={idx} className="p-8 bg-black/20 rounded-[32px] border border-white/5 space-y-6">
+536-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

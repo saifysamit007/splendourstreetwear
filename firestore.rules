@@ -18,8 +18,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.lower() == 'saifysamit@gmail.com' ||
-        request.auth.token.email.lower() == 'splendourstreetwear@gmail.com' ||
+        (request.auth.token.email == 'saifysamit@gmail.com' || 
+         request.auth.token.email == 'splendourstreetwear@gmail.com') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -81,6 +81,17 @@ service cloud.firestore {
              (!sc.keys().contains('storyVideos') || sc.storyVideos is map);
     }
 
+    function isValidCoupon(c) {
+      return c.id is string && c.id.size() <= 128 &&
+             c.code is string && c.code.size() > 0 && c.code.size() <= 50 &&
+             c.discountType in ['percentage', 'fixed'] &&
+             c.discountAmount is number && c.discountAmount >= 0 &&
+             c.usageCount is number && c.usageCount >= 0 &&
+             c.isActive is bool &&
+             (!c.keys().contains('minPurchase') || c.minPurchase is number) &&
+             (!c.keys().contains('usageLimit') || c.usageLimit is number);
+    }
+
     function isValidMessage(m) {
       return m.name is string && m.name.size() > 0 && m.name.size() <= 100 &&
              m.email is string && m.email.size() > 0 && m.email.size() <= 200 &&
@@ -100,8 +111,7 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow get: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId == 'guest');
-      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'guest'));
       allow create: if (isSignedIn() || incoming().userId == 'guest') && isValidId(orderId) && isValidOrder(incoming()) && incoming().id == orderId;
       allow update: if isAdmin() || (
         isSignedIn() && isOwner(existing().userId) && 
@@ -121,6 +131,11 @@ service cloud.firestore {
     match /metadata/siteConfig {
       allow read: if true;
       allow write: if isAdmin() && isValidSiteConfig(incoming());
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(couponId) && isValidCoupon(incoming()) && incoming().id == couponId;
     }
 
     match /messages/{messageId} {

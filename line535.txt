@@ -1,0 +1,7 @@
+                  <div className="space-y-6">
+                  <div className="space-y-6">
+                    <div key={idx} className="p-8 bg-black/20 rounded-[32px] border border-white/5 space-y-6">
+                    <div className="space-y-6">
+                    <div className="space-y-6">
+                  <div className="w-full md:w-1/2 p-10 space-y-6 bg-black/20">
+                  <div className="w-full md:w-1/2 p-10 space-y-6">

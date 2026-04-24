@@ -39,7 +39,7 @@ export default function ProductDetails() {
       <div className="flex-grow flex flex-col items-center justify-center p-6">
         <h1 className="text-2xl font-bold mb-4">Product not found</h1>
         <button 
-          onClick={() => navigate('/info/shop')}
+          onClick={() => navigate('/shop')}
           className="bg-brand-red text-white px-8 py-3 rounded-full font-bold uppercase tracking-widest"
         >
           Back to Shop
@@ -61,7 +61,6 @@ export default function ProductDetails() {
   const shareOptions = [
     { name: 'Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${window.location.href}`, icon: 'FB' },
     { name: 'WhatsApp', url: `https://wa.me/?text=${encodeURIComponent(product.name + ' ' + window.location.href)}`, icon: 'WA' },
-    { name: 'Twitter', url: `https://twitter.com/intent/tweet?url=${window.location.href}&text=${product.name}`, icon: 'TW' },
   ];
 
   // Use size-specific stock if available
@@ -85,7 +84,7 @@ export default function ProductDetails() {
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-brand-muted">
             <span className="hover:text-white cursor-pointer" onClick={() => navigate('/')}>Home</span>
             <ChevronRight size={14} />
-            <span className="hover:text-white cursor-pointer" onClick={() => navigate('/info/shop')}>Shop</span>
+            <span className="hover:text-white cursor-pointer" onClick={() => navigate('/shop')}>Shop</span>
             <ChevronRight size={14} />
             <span className="text-white">{product.name}</span>
           </div>
@@ -163,7 +162,14 @@ export default function ProductDetails() {
                 {product.name}
               </h1>
               <div className="flex items-baseline gap-4">
-                <span className="text-3xl font-mono font-bold text-white">{formatPrice(product.price)}</span>
+                {product.discountPrice ? (
+                  <>
+                    <span className="text-4xl font-mono font-bold text-brand-red">{formatPrice(product.discountPrice)}</span>
+                    <span className="text-xl font-mono font-bold text-brand-muted line-through opacity-50">{formatPrice(product.price)}</span>
+                  </>
+                ) : (
+                  <span className="text-3xl font-mono font-bold text-white">{formatPrice(product.price)}</span>
+                )}
                 <span className="text-xs text-brand-muted uppercase tracking-widest font-bold">Tax Included</span>
               </div>
             </div>

@@ -98,7 +98,7 @@ const initialSiteConfig: SiteConfig = {
   logoText: 'SPLENDOUR',
   navbarLinks: [
     { name: 'Home', href: '/' },
-    { name: 'Shop', href: '/info/shop' },
+    { name: 'Shop', href: '/shop' },
     { name: 'Collection', href: '/info/collections' },
     { name: 'Lookbook', href: '/info/lookbook' },
     { name: 'Size Guide', href: '/size-guide' },
@@ -109,12 +109,12 @@ const initialSiteConfig: SiteConfig = {
     email: "splendourstreetwear@gmail.com",
     phone: "+880 1889010834",
     whatsapp: "8801889010834",
+    bkashNumber: "01889010834",
     address: "Dhaka, Bangladesh",
     mapUrl: "https://maps.app.goo.gl/a6TMysredsrmG6hi9",
     instagramHandle: "@splendourstreetwear",
     social: [
       { platform: 'Instagram', url: 'https://instagram.com/splendourstreetwear' },
-      { platform: 'Twitter', url: 'https://twitter.com/splendourstreetwear' },
       { platform: 'Facebook', url: 'https://facebook.com/splendourstreetwear' },
       { platform: 'Youtube', url: 'https://youtube.com/@splendourstreetwear' }
     ]
@@ -152,10 +152,10 @@ const initialSiteConfig: SiteConfig = {
     { image: 'https://picsum.photos/seed/show4/1200/1600' }
   ],
   collections: [
-    { name: "Essential Loop", tag: "CORE", image: "https://picsum.photos/seed/coll1/1200/800", desc: "Minimalist silhouettes for everyday utility. Engineered for efficiency.", year: "2026", link: "/info/shop?category=Accessories" },
-    { name: "Cyber Drifter", tag: "LIMITED", image: "https://picsum.photos/seed/coll2/1200/800", desc: "Technical fabrics adapted for the chaos of the city. Industrial aesthetics.", year: "2026", link: "/info/shop?category=Jackets" },
-    { name: "Splendour Origins", tag: "ARCHIVE", image: "https://picsum.photos/seed/coll3/1200/800", desc: "The foundational drop that started the culture. A study in raw form.", year: "2020", link: "/info/shop" },
-    { name: "Dhaka Nights", tag: "NEW", image: "https://picsum.photos/seed/coll4/1200/800", desc: "Reflective detailing inspired by the city after dark. High visibility.", year: "2025", link: "/info/shop?category=Hoodies" }
+    { name: "Essential Loop", tag: "CORE", image: "https://picsum.photos/seed/coll1/1200/800", desc: "Minimalist silhouettes for everyday utility. Engineered for efficiency.", year: "2026", link: "/shop?category=Accessories" },
+    { name: "Cyber Drifter", tag: "LIMITED", image: "https://picsum.photos/seed/coll2/1200/800", desc: "Technical fabrics adapted for the chaos of the city. Industrial aesthetics.", year: "2026", link: "/shop?category=Jackets" },
+    { name: "Splendour Origins", tag: "ARCHIVE", image: "https://picsum.photos/seed/coll3/1200/800", desc: "The foundational drop that started the culture. A study in raw form.", year: "2020", link: "/shop" },
+    { name: "Dhaka Nights", tag: "NEW", image: "https://picsum.photos/seed/coll4/1200/800", desc: "Reflective detailing inspired by the city after dark. High visibility.", year: "2025", link: "/shop?category=Hoodies" }
   ],
   lookbooks: [
     { id: '01', title: "URBAN DISTORTION", year: "2026", image: "https://picsum.photos/seed/look1/1600/900", type: "Campaign", desc: "Exploring the intersection of architectural lines and movement.", link: "/info/collections" },
@@ -175,7 +175,7 @@ const initialSiteConfig: SiteConfig = {
     title: "ACCESS GRANTED: 10% OFF",
     message: "Join the collective and synchronize with our newsletter to receive your initial discount protocol code.",
     buttonText: "Join Collective",
-    buttonLink: "/info/shop",
+    buttonLink: "/shop",
     mediaType: 'video',
     mediaUrl: "https://assets.mixkit.co/videos/preview/mixkit-fashion-model-posing-in-a-studio-setting-41793-large.mp4",
     delay: 3
@@ -189,6 +189,15 @@ export const useStore = create<StoreState>()(
       setProducts: (products) => set({ products }),
       cart: [],
       orders: [],
+      coupons: [],
+      setCoupons: (coupons) => set({ coupons }),
+      addCoupon: (coupon) => set((state) => ({ coupons: [coupon, ...state.coupons] })),
+      updateCoupon: (coupon) => set((state) => ({
+        coupons: state.coupons.map((c) => (c.id === coupon.id ? coupon : c)),
+      })),
+      removeCoupon: (id) => set((state) => ({
+        coupons: state.coupons.filter((c) => c.id !== id),
+      })),
       comments: [],
       siteConfig: initialSiteConfig,
       messages: [],

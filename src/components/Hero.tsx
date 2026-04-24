@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useStore } from '../store/useStore';
 
 const TYPING_TEXT = "NEW COLLECTION 2026";
 const FONTS = [
@@ -14,6 +15,7 @@ const FONTS = [
 ];
 
 export default function Hero() {
+  const { siteConfig } = useStore();
   const [displayText, setDisplayText] = useState('');
   const [fontIndex, setFontIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -48,8 +50,19 @@ export default function Hero() {
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
       {/* Background Gradient */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-brand-bg"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-red/20 via-brand-bg to-brand-accent-dark/20 opacity-50"></div>
+        {siteConfig.storyVideos?.hero && (
+          <video 
+            key={siteConfig.storyVideos.hero}
+            src={siteConfig.storyVideos.hero}
+            autoPlay 
+            muted 
+            loop 
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
+          />
+        )}
+        <div className="absolute inset-0 bg-brand-bg/60"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-red/20 via-brand-bg/80 to-brand-accent-dark/20 opacity-50"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-brand-red/10 to-transparent"></div>
       </div>
 

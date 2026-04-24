@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  discountPrice?: number; // Added for product offer system
   image: string;
   images: string[];
   description: string;
@@ -13,6 +14,21 @@ export interface Product {
   sizeStock?: Record<string, number>; // Size-specific stock
   tags?: string[];
   createdAt?: string;
+  manufacturingCost?: number; // Added for manufacturing cost system
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountAmount: number;
+  minPurchase?: number;
+  applicableProductIds?: string[]; // New field for product specificity
+  expiryDate?: string;
+  usageLimit?: number;
+  usageCount: number;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface AppNotification {
@@ -25,6 +41,7 @@ export interface OrderItem {
   id: string;
   name: string;
   price: number;
+  originalPrice: number; // To track if it was discounted
   quantity: number;
 }
 
@@ -37,6 +54,9 @@ export interface Order {
   shippingAddress?: string;
   billingAddress?: string;
   items: OrderItem[];
+  subtotal: number;
+  couponDiscount?: number;
+  couponCode?: string;
   total: number;
   deliveryCharge: number;
   shippingRegion: 'INSIDE_DHAKA' | 'OUTSIDE_DHAKA' | 'INTERNATIONAL';
@@ -58,6 +78,7 @@ export interface SiteConfig {
     email: string;
     phone: string;
     whatsapp: string;
+    bkashNumber?: string;
     address: string;
     mapUrl: string;
     instagramHandle: string;
@@ -77,6 +98,7 @@ export interface SiteConfig {
   storyVideos?: {
     hero: string;
     crafting: string;
+    philosophy?: string;
     modeling1: string;
     modeling2: string;
     modeling3: string;
@@ -136,6 +158,11 @@ export interface StoreState {
   setProducts: (products: Product[]) => void;
   cart: CartItem[];
   orders: Order[];
+  coupons: Coupon[];
+  setCoupons: (coupons: Coupon[]) => void;
+  addCoupon: (coupon: Coupon) => void;
+  updateCoupon: (coupon: Coupon) => void;
+  removeCoupon: (id: string) => void;
   comments: Review[];
   siteConfig: SiteConfig;
   favorites: string[];

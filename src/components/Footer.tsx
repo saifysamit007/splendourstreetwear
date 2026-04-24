@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Instagram, Twitter, Facebook, Youtube, Mail, Phone, MapPin, Heart, MessageCircle, AlertCircle } from 'lucide-react';
+import { Instagram, Facebook, Youtube, Mail, Phone, MapPin, Heart, MessageCircle, AlertCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 
@@ -168,7 +168,7 @@ export default function Footer() {
               Splendour isn't just a brand; it's a statement. We believe in the power of the streets and the elegance of high fashion, creating architectural streetwear for the modern icon.
             </p>
             <div className="flex space-x-4">
-               {siteConfig.footer.social.map((social) => (
+               {siteConfig.footer.social.filter(s => s.platform.toLowerCase() !== 'twitter' && s.platform.toLowerCase() !== 'discord').map((social) => (
                  <a 
                    key={social.platform} 
                    href={social.url} 
@@ -177,12 +177,39 @@ export default function Footer() {
                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brand-red transition-all transform hover:scale-110"
                    aria-label={social.platform}
                  >
-                   {social.platform === 'Instagram' && <Instagram size={18} />}
-                   {social.platform === 'Twitter' && <Twitter size={18} />}
-                   {social.platform === 'Facebook' && <Facebook size={18} />}
-                   {social.platform === 'Youtube' && <Youtube size={18} />}
+                   {social.platform.toLowerCase() === 'instagram' && <Instagram size={18} />}
+                   {social.platform.toLowerCase() === 'facebook' && <Facebook size={18} />}
+                   {social.platform.toLowerCase() === 'youtube' && <Youtube size={18} />}
+                   {social.platform.toLowerCase() === 'tiktok' && (
+                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                       <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+                     </svg>
+                   )}
+                   {social.platform.toLowerCase() === 'whatsapp' && (
+                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.396.015 12.03c0 2.12.554 4.189 1.605 6.006L0 24l6.117-1.604a11.845 11.845 0 005.929 1.64h.005c6.634 0 12.032-5.396 12.035-12.031a11.808 11.808 0 00-3.58-8.502" />
+                       </svg>
+                    )}
+                    {social.platform.toLowerCase() === 'discord' && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.666 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057c2.42 1.782 4.763 2.863 7.057 3.57a.078.078 0 0 0 .084-.028c.541-.74 1.016-1.536 1.417-2.378a.077.077 0 0 0-.041-.106 13.107 13.107 0 0 1-1.887-.9.077.077 0 0 1-.008-.128c.125-.094.252-.192.372-.293a.074.074 0 0 1 .077-.01c4.61 2.12 9.611 2.12 14.17 0a.074.074 0 0 1 .077.01c.12.101.247.199.373.293a.077.077 0 0 1-.007.128 12.986 12.986 0 0 1-1.888.9.076.076 0 0 0-.041.107c.4.843.875 1.637 1.416 2.378a.079.079 0 0 0 .085.028c2.302-.707 4.646-1.788 7.067-3.57a.078.078 0 0 0 .031-.056c.5-5.174-.84-9.66-3.53-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.334-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.334-.946 2.419-2.157 2.419z" />
+                      </svg>
+                    )}
                  </a>
                ))}
+               {siteConfig.footer.whatsapp && !siteConfig.footer.social.some(s => s.platform.toLowerCase() === 'whatsapp') && (
+                 <a 
+                   href={`https://wa.me/${siteConfig.footer.whatsapp}`}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brand-red transition-all transform hover:scale-110"
+                   aria-label="WhatsApp"
+                 >
+                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.396.015 12.03c0 2.12.554 4.189 1.605 6.006L0 24l6.117-1.604a11.845 11.845 0 005.929 1.64h.005c6.634 0 12.032-5.396 12.035-12.031a11.808 11.808 0 00-3.58-8.502" />
+                   </svg>
+                 </a>
+               )}
             </div>
           </div>
 

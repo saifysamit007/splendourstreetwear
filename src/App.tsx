@@ -71,6 +71,28 @@ function AppContent() {
   const location = useLocation();
   const isHome = location.pathname === '/';
 
+  useEffect(() => {
+    // Disable right-click globally
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    // Disable dragging of images/videos
+    const handleDragStart = (e: DragEvent) => {
+      if ((e.target as HTMLElement).tagName === 'IMG' || (e.target as HTMLElement).tagName === 'VIDEO') {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('dragstart', handleDragStart);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('dragstart', handleDragStart);
+    };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -81,9 +103,10 @@ function AppContent() {
       <Navbar />
       <FirebaseSync />
       <main className={cn("flex-grow", !isHome && "pt-24 lg:pt-32")}>
-        <Suspense fallback={<PageLoader />}>
+            <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/shop" element={<InfoPage />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/product/:id" element={<ProductDetails />} />

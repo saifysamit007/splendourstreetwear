@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { formatPrice } from '../constants';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { auth } from '../firebase';
 import { Order } from '../types';
 import Invoice from './Invoice';
@@ -40,8 +40,10 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         id: item.id,
         name: item.name,
         price: item.price,
+        originalPrice: item.price,
         quantity: item.quantity
       })),
+      subtotal: total,
       total: total,
       deliveryCharge: 0,
       shippingRegion: 'INSIDE_DHAKA',
@@ -148,12 +150,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     <h3 className="text-xl font-bold mb-2">Your cart is empty</h3>
                     <p className="text-brand-muted text-sm">Looks like you haven't added anything yet.</p>
                   </div>
-                  <button 
+                  <Link 
+                    to="/shop"
                     onClick={onClose}
-                    className="bg-brand-red hover:bg-brand-accent-dark text-white px-8 py-3 rounded-xl font-bold transition-all"
+                    className="bg-brand-red hover:bg-brand-accent-dark text-white px-8 py-3 rounded-xl font-bold transition-all inline-block"
                   >
                     Start Shopping
-                  </button>
+                  </Link>
                 </div>
               ) : (
                 cart.map((item) => (

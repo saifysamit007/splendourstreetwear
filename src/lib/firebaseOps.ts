@@ -16,11 +16,9 @@ import {
   getDownloadURL 
 } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { Product, Order, Review, SiteConfig } from '../types';
+import { Product, Order, Review, SiteConfig, Coupon } from '../types';
 
 export const firebaseOps = {
-  // ... existing methods (I'll replace the whole export to be safe and updated)
-  
   // Products
   saveProduct: async (product: Product) => {
     await setDoc(doc(db, 'products', product.id), product);
@@ -43,6 +41,14 @@ export const firebaseOps = {
   },
   updateOrder: async (id: string, updates: Partial<Order>) => {
     await updateDoc(doc(db, 'orders', id), updates);
+  },
+
+  // Coupons
+  saveCoupon: async (coupon: Coupon) => {
+    await setDoc(doc(db, 'coupons', coupon.id), coupon);
+  },
+  deleteCoupon: async (id: string) => {
+    await deleteDoc(doc(db, 'coupons', id));
   },
 
   // Reviews

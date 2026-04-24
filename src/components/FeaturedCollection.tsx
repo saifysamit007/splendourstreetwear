@@ -99,7 +99,16 @@ function ProductCard({ product }: { product: any }) {
         >
           {product.name}
         </h4>
-        <p className="text-brand-muted font-medium font-mono">{formatPrice(product.price)}</p>
+        <div className="flex items-center gap-3">
+          {product.discountPrice ? (
+            <>
+              <p className="text-brand-red font-black font-mono">{formatPrice(product.discountPrice)}</p>
+              <p className="text-brand-muted font-medium font-mono text-xs line-through opacity-50">{formatPrice(product.price)}</p>
+            </>
+          ) : (
+            <p className="text-brand-muted font-medium font-mono">{formatPrice(product.price)}</p>
+          )}
+        </div>
       </div>
     </motion.div>
   );

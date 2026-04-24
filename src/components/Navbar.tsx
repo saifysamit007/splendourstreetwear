@@ -88,7 +88,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8">
             {[
               { name: 'Home', href: '/' },
-              { name: 'Shop', href: '/info/shop' },
+              { name: 'Shop', href: '/shop' },
               { name: 'Collections', href: '/info/collections' },
               { name: 'Lookbook', href: '/info/lookbook' },
               { name: 'About', href: '/info/our-story' }
@@ -96,9 +96,20 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 to={link.href}
-                className="text-sm font-black text-brand-muted hover:text-white transition-colors duration-200 uppercase tracking-widest text-[10px]"
+                className="group relative overflow-hidden h-4"
               >
-                {link.name}
+                <motion.div
+                  whileHover={{ y: -16 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  className="flex flex-col"
+                >
+                  <span className="text-sm font-black text-brand-muted uppercase tracking-widest text-[10px] h-4 flex items-center">
+                    {link.name}
+                  </span>
+                  <span className="text-sm font-black text-brand-red uppercase tracking-widest text-[10px] h-4 flex items-center">
+                    {link.name}
+                  </span>
+                </motion.div>
               </Link>
             ))}
           </div>
@@ -118,7 +129,7 @@ export default function Navbar() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        navigate('/info/shop');
+                        navigate('/shop');
                         setIsSearchOpen(false);
                       }
                     }}
@@ -161,7 +172,7 @@ export default function Navbar() {
                     ))}
                     <button
                       onClick={() => {
-                        navigate(`/info/shop`);
+                        navigate(`/shop`);
                         setIsSearchOpen(false);
                       }}
                       className="w-full mt-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted hover:text-white border-t border-white/5 transition-colors"
@@ -298,7 +309,7 @@ export default function Navbar() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        navigate('/info/shop');
+                        navigate('/shop');
                         setMobileMenuOpen(false);
                       }
                     }}
@@ -339,7 +350,7 @@ export default function Navbar() {
                 </AnimatePresence>
                 {[
                   { name: 'Home', href: '/' },
-                  { name: 'Shop', href: '/info/shop' },
+                  { name: 'Shop', href: '/shop' },
                   { name: 'Collections', href: '/info/collections' },
                   { name: 'Lookbook', href: '/info/lookbook' },
                   { name: 'About', href: '/info/our-story' }

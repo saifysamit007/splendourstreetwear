@@ -25,9 +25,8 @@ export default function OfferPopup() {
 
   const handleCTA = () => {
     handleClose();
-    if (config?.buttonLink) {
-      navigate(config.buttonLink);
-    }
+    // Default to shop as requested
+    navigate('/shop');
   };
 
   if (!config?.enabled) return null;

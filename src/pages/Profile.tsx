@@ -400,7 +400,7 @@ export default function Profile() {
                        <h3 className="text-2xl font-display font-black italic uppercase mb-2">Registry Empty</h3>
                        <p className="text-brand-muted text-xs uppercase tracking-widest">No transaction logs detected in local history</p>
                        <Link 
-                         to="/info/shop"
+                         to="/shop"
                          className="mt-8 inline-block bg-white text-black px-8 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-brand-red hover:text-white transition-all shadow-2xl"
                        >
                          Initialize Acquisition

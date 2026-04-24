@@ -5,9 +5,9 @@ import {
   Search, X, Save, Image as ImageIcon, DollarSign, Tag, 
   Folder, List, MousePointer2, AlertCircle, Info, CheckCircle2,
   Users, Zap, ShoppingBag, FileText, Layout, Globe, Facebook, 
-  Instagram, Twitter, PlusCircle, Trash, Menu, ArrowRight, Mail,
+  Instagram, PlusCircle, Trash, Menu, ArrowRight, Mail,
   Bot, Sparkles, Shield, Video, LogIn, ShieldAlert, LayoutGrid, Camera,
-  RefreshCcw, Copy
+  RefreshCcw, Copy, Monitor
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -49,17 +49,19 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(auth.currentUser);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'media' | 'inquiries' | 'config'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'coupons' | 'orders' | 'media' | 'inquiries' | 'config'>('dashboard');
   const { 
     products, addProduct, updateProduct, removeProduct, 
     orders, updateOrder, siteConfig, updateSiteConfig, 
-    messages 
+    messages, coupons, addCoupon, setCoupons, updateCoupon, removeCoupon
   } = useStore();
 
   const isMounted = useRef(true);
   const [tempSiteConfig, setTempSiteConfig] = useState<SiteConfig>(siteConfig);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,6 +113,7 @@ export default function AdminPanel() {
       id: editingProduct?.id || Date.now().toString(),
       name: formData.get('name') as string,
       price: Number(formData.get('price')),
+      discountPrice: formData.get('discountPrice') ? Number(formData.get('discountPrice')) : undefined,
       image: formData.get('image') as string,
       images: (formData.get('images') as string).split(',').map(s => s.trim()),
       description: formData.get('description') as string,
@@ -120,6 +123,7 @@ export default function AdminPanel() {
       colors: Array.from(formData.getAll('colors')) as string[],
       sizeStock: productSizeStock,
       stock: totalStock,
+      manufacturingCost: formData.get('manufacturingCost') ? Number(formData.get('manufacturingCost')) : undefined,
       tags: (formData.get('seo_tags') as string)?.split(',').map(t => t.trim()).filter(Boolean),
       createdAt: editingProduct?.createdAt || new Date().toISOString()
     };
@@ -131,6 +135,37 @@ export default function AdminPanel() {
       showNotification('success', 'Asset synchronized');
       setIsProductModalOpen(false);
       setEditingProduct(null);
+    } catch (error) {
+      showNotification('error', 'Sync failure');
+    }
+  };
+
+  const handleSaveCoupon = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const selectedProducts = Array.from(formData.getAll('applicableProducts')) as string[];
+    
+    const newCoupon: any = {
+      id: editingCoupon?.id || Date.now().toString(),
+      code: (formData.get('code') as string).toUpperCase(),
+      discountType: formData.get('discountType') as any,
+      discountAmount: Number(formData.get('discountAmount')),
+      minPurchase: Number(formData.get('minPurchase')) || 0,
+      applicableProductIds: selectedProducts.length > 0 ? selectedProducts : undefined,
+      expiryDate: formData.get('expiryDate') as string,
+      usageLimit: Number(formData.get('usageLimit')) || undefined,
+      usageCount: editingCoupon?.usageCount || 0,
+      isActive: formData.get('isActive') === 'on',
+      createdAt: editingCoupon?.createdAt || new Date().toISOString()
+    };
+
+    try {
+      await firebaseOps.saveCoupon(newCoupon);
+      if (editingCoupon) updateCoupon(newCoupon);
+      else addCoupon(newCoupon);
+      showNotification('success', 'Coupon protocol logged');
+      setIsCouponModalOpen(false);
+      setEditingCoupon(null);
     } catch (error) {
       showNotification('error', 'Sync failure');
     }
@@ -195,6 +230,7 @@ export default function AdminPanel() {
           {[
             { id: 'dashboard', icon: LayoutDashboard, label: 'Stats' },
             { id: 'products', icon: Package, label: 'Inventory' },
+            { id: 'coupons', icon: Tag, label: 'Coupons' },
             { id: 'orders', icon: ShoppingBag, label: 'Orders' },
             { id: 'media', icon: Video, label: 'Media' },
             { id: 'inquiries', icon: Mail, label: 'Inquiries' },
@@ -232,6 +268,14 @@ export default function AdminPanel() {
                  <Plus size={20} /> New Identity
                </button>
              )}
+             {activeTab === 'coupons' && (
+               <button 
+                  onClick={() => { setEditingCoupon(null); setIsCouponModalOpen(true); }}
+                  className="bg-white text-black px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:bg-brand-red hover:text-white transition-all shadow-2xl"
+               >
+                 <Plus size={20} /> New Protocol
+               </button>
+             )}
              <div className="bg-brand-card/50 border border-white/10 p-4 rounded-3xl flex items-center gap-4 flex-grow md:flex-grow-0">
                <Search className="text-brand-muted" size={18} />
                <input 
@@ -249,10 +293,11 @@ export default function AdminPanel() {
         {/* Dashboard */}
         {activeTab === 'dashboard' && (
           <div className="space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
               <StatCard label="Revenue" value={formatPrice(orders.reduce((s, o) => s + o.total, 0))} icon={DollarSign} trend="+12%" />
               <StatCard label="Orders" value={orders.length} icon={ShoppingBag} trend="+5" />
               <StatCard label="Inventory" value={products.length} icon={Package} trend="Stable" />
+              <StatCard label="Cost Analysis" value={formatPrice(products.reduce((s, p) => s + ((p.manufacturingCost || 0) * (p.stock || 0)), 0))} icon={Zap} trend="Live" />
               <StatCard label="Customers" value="1.5k" icon={Users} trend="+8%" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -318,6 +363,56 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {/* Coupons */}
+        {activeTab === 'coupons' && (
+          <div className="bg-brand-card/30 border border-white/5 rounded-[32px] overflow-x-auto">
+             <table className="w-full text-left">
+               <thead className="border-b border-white/5 text-[10px] font-black uppercase tracking-widest text-brand-muted bg-white/[0.02]">
+                 <tr>
+                   <th className="p-6">Code</th>
+                   <th className="p-6">Discount</th>
+                   <th className="p-6">Min Purchase</th>
+                   <th className="p-6">Usage</th>
+                   <th className="p-6">Status</th>
+                   <th className="p-6">Actions</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-white/5">
+                 {coupons.filter(c => c.code.toLowerCase().includes(searchQuery.toLowerCase())).map(c => (
+                   <tr key={c.id} className="text-xs hover:bg-white/[0.01]">
+                     <td className="p-6 font-mono font-bold text-brand-red">{c.code}</td>
+                     <td className="p-6">
+                        {c.discountType === 'percentage' ? `${c.discountAmount}%` : formatPrice(c.discountAmount)}
+                     </td>
+                     <td className="p-6 font-mono">{formatPrice(c.minPurchase || 0)}</td>
+                     <td className="p-6 text-brand-muted">
+                        {c.usageCount} / {c.usageLimit || '∞'}
+                     </td>
+                     <td className="p-6">
+                        <span className={cn(
+                          "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+                          c.isActive ? "bg-green-500/10 text-green-500" : "bg-brand-red/10 text-brand-red"
+                        )}>
+                          {c.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                     </td>
+                     <td className="p-6">
+                        <div className="flex gap-2">
+                           <button onClick={() => { setEditingCoupon(c); setIsCouponModalOpen(true); }} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+                             <Edit2 size={14} className="text-brand-muted hover:text-white" />
+                           </button>
+                           <button onClick={() => confirm('Purge Protocol?') && firebaseOps.deleteCoupon(c.id).then(() => removeCoupon(c.id))} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+                             <Trash2 size={14} className="text-brand-muted hover:text-brand-red" />
+                           </button>
+                        </div>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+          </div>
+        )}
+
         {/* Orders */}
         {activeTab === 'orders' && (
           <div className="bg-brand-card/30 border border-white/5 rounded-[32px] overflow-x-auto">
@@ -364,17 +459,186 @@ export default function AdminPanel() {
         {/* Media Architecture View */}
         {activeTab === 'media' && (
           <div className="max-w-5xl mx-auto space-y-12 pb-24">
+            {/* Hero Section */}
             <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
                <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red mb-12 flex items-center gap-4">
-                  <Camera size={24} /> Lookbook Content Hierarchy
+                  <Zap size={24} /> Hero Visual Engine
                </h3>
+               <div className="space-y-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Main Hero Background Video/Image</label>
+                  <input 
+                     value={tempSiteConfig.storyVideos?.hero || ''}
+                     onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, hero: e.target.value } as any })}
+                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     placeholder="URL for the very first landing page banner"
+                  />
+               </div>
+            </div>
+
+            {/* Showcase Section (A NEW ERA OF STREET LUXURY) */}
+            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+               <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red mb-12 flex items-center gap-4">
+                  <Monitor size={24} /> Showcase Grid (A New Era of Street Luxury)
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div key={idx} className="p-6 bg-black/20 rounded-3xl border border-white/5 space-y-4">
+                       <span className="text-[10px] font-black uppercase text-brand-muted tracking-widest">Asset {idx + 1}</span>
+                       <div className="space-y-2">
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Image URL</label>
+                          <input 
+                            value={tempSiteConfig.showcaseMedia?.[idx]?.image || ''} 
+                            onChange={(e) => {
+                              const newShowcase = [...(tempSiteConfig.showcaseMedia || [])];
+                              if (!newShowcase[idx]) newShowcase[idx] = { image: '', video: '' };
+                              newShowcase[idx] = { ...newShowcase[idx], image: e.target.value };
+                              setTempSiteConfig({ ...tempSiteConfig, showcaseMedia: newShowcase });
+                            }} 
+                            className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-mono" 
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Video URL (Optional)</label>
+                          <input 
+                            value={tempSiteConfig.showcaseMedia?.[idx]?.video || ''} 
+                            onChange={(e) => {
+                              const newShowcase = [...(tempSiteConfig.showcaseMedia || [])];
+                              if (!newShowcase[idx]) newShowcase[idx] = { image: '', video: '' };
+                              newShowcase[idx] = { ...newShowcase[idx], video: e.target.value };
+                              setTempSiteConfig({ ...tempSiteConfig, showcaseMedia: newShowcase });
+                            }} 
+                            className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-mono" 
+                          />
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+
+            {/* Collections Section */}
+            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+                <div className="flex items-center justify-between mb-12">
+                   <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red flex items-center gap-4">
+                      <LayoutGrid size={24} /> Collections Gallery Configuration
+                   </h3>
+                   <button 
+                      onClick={() => {
+                        const newCols = [...(tempSiteConfig.collections || [])];
+                        newCols.push({ name: '', tag: '', image: '', video: '', desc: '', year: (new Date().getFullYear().toString()), link: '/shop' });
+                        setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                      }}
+                      className="bg-brand-red text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full flex items-center gap-2 hover:bg-brand-accent-dark transition-all"
+                   >
+                      <PlusCircle size={16} /> Add Collection
+                   </button>
+                </div>
+               <div className="space-y-8">
+                  {(tempSiteConfig.collections || []).map((col: any, idx: number) => (
+                    <div key={idx} className="p-8 bg-black/20 rounded-[32px] border border-white/5 space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Collection Name</label>
+                             <input value={col.name} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, name: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-sm uppercase font-black" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Tag (e.g. NEW, CORE)</label>
+                             <input value={col.tag} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, tag: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-sm uppercase font-black" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Main Image URL</label>
+                             <input value={col.image} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, image: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-[10px] font-mono" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Video Asset (Optional)</label>
+                             <input value={col.video || ''} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, video: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-[10px] font-mono" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Release Year</label>
+                             <input value={col.year} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, year: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-[10px] font-mono" />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Action Link</label>
+                             <input value={col.link} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, link: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-[10px] font-mono" />
+                          </div>
+                          <div className="md:col-span-2 space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Archive Narrative (Description)</label>
+                             <textarea value={col.desc} onChange={(e) => {
+                               const newCols = [...(tempSiteConfig.collections || [])];
+                               newCols[idx] = { ...col, desc: e.target.value };
+                               setTempSiteConfig({ ...tempSiteConfig, collections: newCols });
+                             }} className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-sm leading-relaxed resize-none h-24" />
+                          </div>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+
+            {/* Lookbook Section */}
+            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+                <div className="flex items-center justify-between mb-12">
+                   <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red flex items-center gap-4">
+                      <Camera size={24} /> Lookbook Content Hierarchy
+                   </h3>
+                   <button 
+                      onClick={() => {
+                        const newLbs = [...(tempSiteConfig.lookbooks || [])];
+                        newLbs.push({ 
+                          id: (newLbs.length + 1).toString().padStart(2, '0'), 
+                          title: '', 
+                          year: (new Date().getFullYear().toString()), 
+                          image: '', 
+                          video: '', 
+                          type: 'Campaign', 
+                          desc: '', 
+                          link: '/info/collections' 
+                        });
+                        setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
+                      }}
+                      className="bg-brand-red text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full flex items-center gap-2 hover:bg-brand-accent-dark transition-all"
+                   >
+                      <PlusCircle size={16} /> Add Lookbook
+                   </button>
+                </div>
                
                <div className="space-y-10">
-                  {(tempSiteConfig.lookbooks || []).map((lb, idx) => (
+                  {(tempSiteConfig.lookbooks || []).map((lb: any, idx: number) => (
                     <div key={idx} className="p-8 bg-black/20 rounded-[32px] border border-white/5 space-y-8 group transition-all hover:border-brand-red/30">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Asset Title</label>
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">ID Index</label>
+                          <input value={lb.id} onChange={(e) => {
+                            const newLbs = [...(tempSiteConfig.lookbooks || [])];
+                            newLbs[idx] = { ...lb, id: e.target.value };
+                            setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
+                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Asset Title</label>
                           <input 
                             value={lb.title} 
                             onChange={(e) => {
@@ -386,25 +650,37 @@ export default function AdminPanel() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Type / SS</label>
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Release Year</label>
+                          <input value={lb.year} onChange={(e) => {
+                            const newLbs = [...(tempSiteConfig.lookbooks || [])];
+                            newLbs[idx] = { ...lb, year: e.target.value };
+                            setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
+                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Visual Identity (Type)</label>
                           <input value={lb.type} onChange={(e) => {
                             const newLbs = [...(tempSiteConfig.lookbooks || [])];
                             newLbs[idx] = { ...lb, type: e.target.value };
                             setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
-                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs" />
+                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs uppercase" />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Archive Link</label>
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Action Link (Redirect Target)</label>
                           <input value={lb.link} onChange={(e) => {
                             const newLbs = [...(tempSiteConfig.lookbooks || [])];
                             newLbs[idx] = { ...lb, link: e.target.value };
                             setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
-                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" placeholder="/info/collections" />
+                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" placeholder="/shop" />
                         </div>
                       </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Primary Media Link (Image)</label>
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Primary Image link</label>
                           <input value={lb.image} onChange={(e) => {
                             const newLbs = [...(tempSiteConfig.lookbooks || [])];
                             newLbs[idx] = { ...lb, image: e.target.value };
@@ -412,16 +688,81 @@ export default function AdminPanel() {
                           }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Dynamic Video Loop (Optional)</label>
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Dynamic Video Loop (Optional)</label>
                           <input value={lb.video || ''} onChange={(e) => {
                             const newLbs = [...(tempSiteConfig.lookbooks || [])];
                             newLbs[idx] = { ...lb, video: e.target.value };
                             setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
                           }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs font-mono" />
                         </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="text-[8px] font-black uppercase tracking-widest text-brand-muted">Visual Narrative (Description)</label>
+                          <textarea value={lb.desc} onChange={(e) => {
+                            const newLbs = [...(tempSiteConfig.lookbooks || [])];
+                            newLbs[idx] = { ...lb, desc: e.target.value };
+                            setTempSiteConfig({ ...tempSiteConfig, lookbooks: newLbs });
+                          }} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-xs leading-relaxed resize-none h-20" />
+                        </div>
                       </div>
                     </div>
                   ))}
+               </div>
+            </div>
+
+            {/* Story Videos Section */}
+            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+               <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red mb-12 flex items-center gap-4">
+                  <FileText size={24} /> Brand Story Narrative Media
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Philosophy Video URL</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.philosophy || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, philosophy: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Craftsmanship Video URL</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.crafting || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, crafting: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Mission Video URL</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.mission || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, mission: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Modeling Video 01</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.modeling1 || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, modeling1: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Modeling Video 02</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.modeling2 || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, modeling2: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Modeling Video 03</label>
+                     <input 
+                        value={tempSiteConfig.storyVideos?.modeling3 || ''}
+                        onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, storyVideos: { ...tempSiteConfig.storyVideos, modeling3: e.target.value } as any })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-xs font-mono"
+                     />
+                  </div>
                </div>
             </div>
 
@@ -558,6 +899,70 @@ export default function AdminPanel() {
                           />
                        </div>
                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Facebook URL</label>
+                          <input 
+                             value={tempSiteConfig.footer?.social?.find((s: any) => s.platform === 'Facebook')?.url || ''}
+                             onChange={(e) => {
+                               const newSocial = [...(tempSiteConfig.footer?.social || [])];
+                               const idx = newSocial.findIndex((s: any) => s.platform === 'Facebook');
+                               if (idx > -1) newSocial[idx].url = e.target.value;
+                               else newSocial.push({ platform: 'Facebook', url: e.target.value });
+                               setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, social: newSocial } });
+                             }}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                             placeholder="https://facebook.com/..."
+                          />
+                       </div>
+
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">YouTube URL</label>
+                          <input 
+                             value={tempSiteConfig.footer?.social?.find((s: any) => s.platform === 'Youtube')?.url || ''}
+                             onChange={(e) => {
+                               const newSocial = [...(tempSiteConfig.footer?.social || [])];
+                               const idx = newSocial.findIndex((s: any) => s.platform === 'Youtube');
+                               if (idx > -1) newSocial[idx].url = e.target.value;
+                               else newSocial.push({ platform: 'Youtube', url: e.target.value });
+                               setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, social: newSocial } });
+                             }}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                             placeholder="https://youtube.com/@..."
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">TikTok URL</label>
+                          <input 
+                             value={tempSiteConfig.footer?.social?.find((s: any) => s.platform === 'TikTok')?.url || ''}
+                             onChange={(e) => {
+                               const newSocial = [...(tempSiteConfig.footer?.social || [])];
+                               const idx = newSocial.findIndex((s: any) => s.platform === 'TikTok');
+                               if (idx > -1) newSocial[idx].url = e.target.value;
+                               else newSocial.push({ platform: 'TikTok', url: e.target.value });
+                               setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, social: newSocial } });
+                             }}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                             placeholder="https://tiktok.com/@..."
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">WhatsApp Number</label>
+                          <input 
+                             value={tempSiteConfig.footer?.whatsapp || ''}
+                             onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, whatsapp: e.target.value } })}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                             placeholder="88017..."
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">bKash Manual Number</label>
+                          <input 
+                             value={tempSiteConfig.footer?.bkashNumber || ''}
+                             onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, bkashNumber: e.target.value } })}
+                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                             placeholder="01XXXXXXXXX"
+                          />
+                       </div>
+                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Email (Contact)</label>
                           <input 
                              value={tempSiteConfig.footer?.email || ''}
@@ -573,14 +978,6 @@ export default function AdminPanel() {
                           <input 
                              value={tempSiteConfig.footer?.address || ''}
                              onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, address: e.target.value } })}
-                             className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">WhatsApp Number</label>
-                          <input 
-                             value={tempSiteConfig.footer?.whatsapp || ''}
-                             onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, footer: { ...tempSiteConfig.footer, whatsapp: e.target.value } })}
                              className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
                           />
                        </div>
@@ -672,9 +1069,13 @@ export default function AdminPanel() {
                               <input name="price" type="number" required defaultValue={editingProduct?.price} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
                            </div>
                            <div className="space-y-1">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Total Stock</label>
-                              <input name="stock_readonly" readOnly value={Object.values(productSizeStock).reduce((a, b) => a + b, 0)} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono opacity-50" />
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Mfg Cost</label>
+                              <input name="manufacturingCost" type="number" defaultValue={editingProduct?.manufacturingCost} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
                            </div>
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Offer Price (Optional)</label>
+                           <input name="discountPrice" type="number" defaultValue={editingProduct?.discountPrice} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
                         </div>
                         <div className="space-y-1">
                            <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Architectural Morphology (Size-Wise Stock)</label>
@@ -773,6 +1174,93 @@ export default function AdminPanel() {
                <Invoice order={selectedOrder} config={siteConfig.invoice} />
                <button onClick={() => setIsInvoiceModalOpen(false)} className="absolute -top-12 right-0 p-3 bg-white/10 rounded-full text-white"><X size={24} /></button>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Coupon Modal */}
+      <AnimatePresence>
+        {isCouponModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsCouponModalOpen(false)} className="absolute inset-0 bg-black/90 backdrop-blur-xl" />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-2xl bg-brand-card border border-white/10 rounded-[32px] overflow-hidden">
+               <form onSubmit={handleSaveCoupon} className="p-10 space-y-8 overflow-y-auto max-h-[90vh] no-scrollbar">
+                  <h3 className="text-3xl font-display font-black uppercase italic tracking-tighter">Coupon Protocol</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Coupon Code</label>
+                        <input name="code" required defaultValue={editingCoupon?.code} placeholder="SUMMER25" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono uppercase focus:border-brand-red outline-none" />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Status</label>
+                        <div className="flex items-center gap-4 h-[52px]">
+                           <input type="checkbox" name="isActive" defaultChecked={editingCoupon?.isActive !== false} className="w-5 h-5 accent-brand-red" />
+                           <span className="text-[10px] font-black uppercase tracking-widest">Active</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Discount Type</label>
+                        <select name="discountType" defaultValue={editingCoupon?.discountType || 'percentage'} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-black uppercase tracking-widest outline-none appearance-none">
+                           <option value="percentage">Percentage (%)</option>
+                           <option value="fixed">Fixed Amount</option>
+                        </select>
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Discount Value</label>
+                        <input name="discountAmount" type="number" required defaultValue={editingCoupon?.discountAmount} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Min Purchase</label>
+                        <input name="minPurchase" type="number" defaultValue={editingCoupon?.minPurchase || 0} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Expiry Date</label>
+                        <input name="expiryDate" type="date" defaultValue={editingCoupon?.expiryDate} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Usage Limit</label>
+                        <input name="usageLimit" type="number" defaultValue={editingCoupon?.usageLimit} placeholder="Unlimited" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono" />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Usage Count (Readonly)</label>
+                        <input value={editingCoupon?.usageCount || 0} readOnly className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-mono opacity-50" />
+                     </div>
+                  </div>
+
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Applicable Products (Optional - Apply to ALL if empty)</label>
+                     <div className="max-h-48 overflow-y-auto no-scrollbar grid grid-cols-1 gap-2 p-4 bg-white/5 border border-white/10 rounded-2xl">
+                        {products.map(p => (
+                          <label key={p.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors">
+                             <input 
+                                type="checkbox" 
+                                name="applicableProducts" 
+                                value={p.id}
+                                defaultChecked={editingCoupon?.applicableProductIds?.includes(p.id)}
+                                className="w-4 h-4 accent-brand-red" 
+                             />
+                             <img src={p.image} className="w-8 h-8 object-cover rounded" />
+                             <span className="text-[10px] font-black uppercase truncate">{p.name}</span>
+                          </label>
+                        ))}
+                     </div>
+                  </div>
+
+                  <button type="submit" className="w-full bg-brand-red text-white py-5 rounded-[40px] font-black uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all shadow-2xl">
+                    Log Coupon Protocol
+                  </button>
+               </form>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

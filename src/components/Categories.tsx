@@ -42,7 +42,7 @@ function CategoryCard({ cat, idx }: { cat: CategoryItem, idx: number }) {
 
   return (
     <Link 
-      to={`/info/shop?category=${cat.name}`}
+      to={`/shop?category=${cat.name}`}
       className={cn(cat.grid, "h-full")}
     >
       <motion.div
