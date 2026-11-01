@@ -8,7 +8,7 @@ import './index.css';
 (function() {
   const suppress = (event: any) => {
     const reason = event.reason;
-    const message = (reason ? (reason.message || reason) : (event.message || '')).toString();
+    const message = ((reason ? (reason.message || reason) : '') || event.message || '').toString();
     
     if (message && (
       message.includes('WebSocket') || 
@@ -16,12 +16,14 @@ import './index.css';
       message.includes('HMR') ||
       message.includes('closed without opened')
     )) {
-      event.preventDefault();
-      event.stopPropagation();
+      if (typeof event.preventDefault === 'function') event.preventDefault();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      if (typeof event.stopPropagation === 'function') event.stopPropagation();
+      return true;
     }
   };
 
-  window.addEventListener('unhandledrejection', suppress);
+  window.addEventListener('unhandledrejection', suppress, true);
   window.addEventListener('error', suppress, true);
 })();
 

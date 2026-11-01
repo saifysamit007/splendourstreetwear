@@ -68,10 +68,14 @@ function ProductCard({ product }: { product: any }) {
           referrerPolicy="no-referrer"
         />
         
-        {/* Tag */}
-        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 z-20">
-          <span className="text-[10px] font-bold uppercase tracking-wider">{product.tag}</span>
-        </div>
+        {/* Tag Badge */}
+        {product.tag && (
+          <div className="absolute top-4 left-4 z-20 pointer-events-none">
+            <span className="bg-brand-red text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg shadow-brand-red/20 border border-brand-red/30">
+              {product.tag}
+            </span>
+          </div>
+        )}
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6 z-10 pointer-events-none group-hover:pointer-events-auto">
@@ -198,7 +202,7 @@ export default function FeaturedCollection() {
   }
 
   return (
-    <section className="pt-32 pb-24 bg-brand-bg relative" id="shop">
+    <section className="pt-24 md:pt-36 pb-24 bg-brand-bg relative scroll-mt-28" id="shop">
       <div className="max-w-7xl mx-auto px-6 mb-12 flex items-end justify-between relative z-30">
         <div>
           <h2 className="text-sm font-bold text-brand-red uppercase tracking-[0.3em] mb-4">Curated Selection</h2>
@@ -223,7 +227,7 @@ export default function FeaturedCollection() {
         <div 
           ref={scrollRef}
           onMouseDown={handleMouseDown}
-          className="flex overflow-x-auto gap-8 md:gap-12 px-6 md:px-20 pb-12 no-scrollbar snap-x snap-mandatory perspective-1000 cursor-grab active:cursor-grabbing relative z-40"
+          className="flex overflow-x-auto gap-8 md:gap-12 px-6 md:px-20 pt-6 pb-12 no-scrollbar snap-x snap-mandatory perspective-1000 cursor-grab active:cursor-grabbing relative z-40"
           style={{ 
             perspective: "1000px",
             scrollPaddingLeft: window.innerWidth < 768 ? '1.5rem' : '5rem'
