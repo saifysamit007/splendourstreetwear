@@ -7,16 +7,18 @@ import {
   Users, Zap, ShoppingBag, FileText, Layout, Globe, Facebook, 
   Instagram, PlusCircle, Trash, Menu, ArrowRight, Mail,
   Bot, Sparkles, Shield, Video, LogIn, ShieldAlert, LayoutGrid, Camera,
-  RefreshCcw, Copy, Monitor
+  RefreshCcw, Copy, Monitor, Bell
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { getDoc, doc } from 'firebase/firestore';
+import { getDoc, doc, collection, getDocs } from 'firebase/firestore';
 import { firebaseOps } from '../lib/firebaseOps';
 import { useStore } from '../store/useStore';
+import { handleFirestoreError, OperationType } from '../lib/utils';
 import { Product, Order, SiteConfig } from '../types';
 import { cn } from '../lib/utils';
 import { formatPrice, categories as availableCategories, sizes as availableSizes, colors as availableColors } from '../constants';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 import Invoice from '../components/Invoice';
 import SEO from '../components/SEO';
 import Markdown from 'react-markdown';
@@ -49,14 +51,17 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(auth.currentUser);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'coupons' | 'orders' | 'media' | 'inquiries' | 'config'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'coupons' | 'orders' | 'media' | 'inquiries' | 'newsletter' | 'config'>('dashboard');
   const { 
     products, addProduct, updateProduct, removeProduct, 
     orders, updateOrder, siteConfig, updateSiteConfig, 
-    messages, coupons, addCoupon, setCoupons, updateCoupon, removeCoupon
+    messages, coupons, addCoupon, setCoupons, updateCoupon, removeCoupon, addNotification,
+    traffic, subscribers
   } = useStore();
 
   const isMounted = useRef(true);
+  const prevOrdersCount = useRef(orders.length);
+  const prevMessagesCount = useRef(messages.length);
   const [tempSiteConfig, setTempSiteConfig] = useState<SiteConfig>(siteConfig);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -70,6 +75,17 @@ export default function AdminPanel() {
   // Per-size stock state for the modal
   const [productSizeStock, setProductSizeStock] = useState<Record<string, number>>({});
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [tempImages, setTempImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (editingProduct && isProductModalOpen) {
+      setProductSizeStock(editingProduct.sizeStock || {});
+      setTempImages(editingProduct.images || []);
+    } else if (isProductModalOpen) {
+      setProductSizeStock({});
+      setTempImages(['']);
+    }
+  }, [editingProduct, isProductModalOpen]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -80,18 +96,50 @@ export default function AdminPanel() {
         setIsAdmin(false);
         return;
       }
+      
+      // Auth persistence logic
       const email = u.email?.toLowerCase();
-      if (email === 'saifysamit@gmail.com' || email === 'splendourstreetwear@gmail.com') {
+      const isAdminUser = email === 'saifysamit@gmail.com' || email === 'splendourstreetwear@gmail.com';
+      
+      if (isAdminUser) {
         setIsAdmin(true);
       } else {
-        const d = await getDoc(doc(db, 'admins', u.uid));
-        setIsAdmin(d.exists());
+        try {
+          const d = await getDoc(doc(db, 'admins', u.uid));
+          if (d.exists()) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `admins/${u.uid}`);
+        }
       }
     });
     return () => { isMounted.current = false; unsub(); };
   }, []);
 
   useEffect(() => { if (siteConfig) setTempSiteConfig(siteConfig); }, [siteConfig]);
+
+  useEffect(() => {
+    if (orders.length > prevOrdersCount.current) {
+      const newOrders = orders.filter(o => o.status === 'pending');
+      if (newOrders.length > 0) {
+        addNotification(`New architectural acquisition logged from ${newOrders[0].customerName}`, 'success');
+      }
+    }
+    prevOrdersCount.current = orders.length;
+  }, [orders.length, addNotification]);
+
+  useEffect(() => {
+    if (messages.length > prevMessagesCount.current) {
+      const newMessages = messages.filter(m => m.status === 'new');
+      if (newMessages.length > 0) {
+        addNotification(`Incoming inquiry from protocol ${newMessages[0].name}`, 'info');
+      }
+    }
+    prevMessagesCount.current = messages.length;
+  }, [messages.length, addNotification]);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -109,13 +157,17 @@ export default function AdminPanel() {
     // Calculate total stock from sizeStock
     const totalStock = Object.values(productSizeStock).reduce((a, b) => a + b, 0);
 
+    const images = tempImages.filter(img => img.trim() !== '');
+    const mainImage = images[0] || (formData.get('image') as string);
+    const finalImages = images.length > 0 ? images : [mainImage];
+
     const newProduct: Product = {
       id: editingProduct?.id || Date.now().toString(),
       name: formData.get('name') as string,
       price: Number(formData.get('price')),
       discountPrice: formData.get('discountPrice') ? Number(formData.get('discountPrice')) : undefined,
-      image: formData.get('image') as string,
-      images: (formData.get('images') as string).split(',').map(s => s.trim()),
+      image: mainImage,
+      images: finalImages,
       description: formData.get('description') as string,
       tag: formData.get('tag') as string,
       category: formData.get('category') as string,
@@ -225,15 +277,16 @@ export default function AdminPanel() {
       <SEO title="Control Station | Admin" description="Master administrative control." />
       
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-72 border-r border-white/5 flex-col bg-brand-card/30 h-[calc(100vh-80px)]">
+      <aside className="hidden lg:flex w-72 border-r border-white/5 flex-col bg-brand-card/30 h-[calc(100vh-80px)]">
         <nav className="flex-grow p-6 space-y-2">
           {[
             { id: 'dashboard', icon: LayoutDashboard, label: 'Stats' },
             { id: 'products', icon: Package, label: 'Inventory' },
             { id: 'coupons', icon: Tag, label: 'Coupons' },
-            { id: 'orders', icon: ShoppingBag, label: 'Orders' },
+            { id: 'orders', icon: ShoppingBag, label: 'Orders', badge: orders.filter(o => o.status === 'pending').length },
             { id: 'media', icon: Video, label: 'Media' },
-            { id: 'inquiries', icon: Mail, label: 'Inquiries' },
+            { id: 'inquiries', icon: Mail, label: 'Inquiries', badge: messages.filter(m => m.status === 'new').length },
+            { id: 'newsletter', icon: Bell, label: 'Newsletter' },
             { id: 'config', icon: Settings, label: 'System' },
           ].map((item) => (
             <button
@@ -246,6 +299,11 @@ export default function AdminPanel() {
             >
               <item.icon size={18} />
               <span className="font-black uppercase tracking-widest text-[10px]">{item.label}</span>
+              {item.badge ? (
+                <span className="ml-auto bg-white text-black text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                  {item.badge}
+                </span>
+              ) : null}
               {activeTab === item.id && <motion.div layoutId="active" className="absolute left-0 w-1 h-2/3 bg-white rounded-full" />}
             </button>
           ))}
@@ -253,27 +311,35 @@ export default function AdminPanel() {
         <div className="p-8 opacity-20 text-[8px] font-black uppercase tracking-widest text-center">V.5.0 ARCHITECTURAL</div>
       </aside>
 
-      <main className="flex-grow p-6 md:p-12 overflow-y-auto max-h-[calc(100vh-80px)] no-scrollbar">
+      <main className="flex-grow p-6 lg:p-12 overflow-y-auto max-h-[calc(100vh-80px)] no-scrollbar">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
-           <h2 className="text-3xl md:text-6xl font-display font-black uppercase tracking-tighter leading-none">
-             {activeTab.toUpperCase()}
-           </h2>
-           <div className="flex gap-4 w-full md:w-auto">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-16 gap-8">
+           <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden p-3 bg-white/5 border border-white/10 rounded-xl"
+              >
+                <Menu size={20} />
+              </button>
+              <h2 className="text-3xl md:text-6xl font-display font-black uppercase tracking-tighter leading-none">
+                {activeTab.toUpperCase()}
+              </h2>
+           </div>
+           <div className="flex gap-4 w-full lg:w-auto">
              {activeTab === 'products' && (
                <button 
                   onClick={() => { setEditingProduct(null); setProductSizeStock({}); setIsProductModalOpen(true); }}
-                  className="bg-white text-black px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:bg-brand-red hover:text-white transition-all shadow-2xl"
+                  className="flex-grow md:flex-grow-0 bg-white text-black px-6 py-4 rounded-3xl font-black uppercase tracking-widest text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-brand-red hover:text-white transition-all shadow-2xl"
                >
-                 <Plus size={20} /> New Identity
+                 <Plus size={18} /> New Identity
                </button>
              )}
              {activeTab === 'coupons' && (
                <button 
                   onClick={() => { setEditingCoupon(null); setIsCouponModalOpen(true); }}
-                  className="bg-white text-black px-8 py-4 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:bg-brand-red hover:text-white transition-all shadow-2xl"
+                  className="flex-grow md:flex-grow-0 bg-white text-black px-6 py-4 rounded-3xl font-black uppercase tracking-widest text-[10px] md:text-xs flex items-center justify-center gap-2 hover:bg-brand-red hover:text-white transition-all shadow-2xl"
                >
-                 <Plus size={20} /> New Protocol
+                 <Plus size={18} /> New Protocol
                </button>
              )}
              <div className="bg-brand-card/50 border border-white/10 p-4 rounded-3xl flex items-center gap-4 flex-grow md:flex-grow-0">
@@ -288,43 +354,120 @@ export default function AdminPanel() {
            </div>
         </div>
 
+        {/* Mobile Sidebar Overlay */}
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSidebarOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden"
+              />
+              <motion.aside 
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed inset-y-0 left-0 w-72 bg-brand-bg border-r border-white/5 z-[110] lg:hidden flex flex-col"
+              >
+                <div className="p-8 border-b border-white/5 flex justify-between items-center">
+                   <h2 className="text-xl font-display font-black tracking-tighter">CONTROL</h2>
+                   <button onClick={() => setIsSidebarOpen(false)} className="p-2 bg-white/5 rounded-lg"><X size={18}/></button>
+                </div>
+                <nav className="flex-grow p-6 space-y-2">
+                  {[
+                    { id: 'dashboard', icon: LayoutDashboard, label: 'Stats' },
+                    { id: 'products', icon: Package, label: 'Inventory' },
+                    { id: 'coupons', icon: Tag, label: 'Coupons' },
+                    { id: 'orders', icon: ShoppingBag, label: 'Orders', badge: orders.filter(o => o.status === 'pending').length },
+                    { id: 'media', icon: Video, label: 'Media' },
+                    { id: 'inquiries', icon: Mail, label: 'Inquiries', badge: messages.filter(m => m.status === 'new').length },
+                    { id: 'newsletter', icon: Bell, label: 'Newsletter' },
+                    { id: 'config', icon: Settings, label: 'System' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setActiveTab(item.id as any); setIsSidebarOpen(false); }}
+                      className={cn(
+                        "w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all text-left",
+                        activeTab === item.id ? "bg-brand-red text-white" : "text-brand-muted hover:bg-white/5"
+                      )}
+                    >
+                      <item.icon size={18} />
+                      <span className="font-black uppercase tracking-widest text-[10px]">{item.label}</span>
+                      {item.badge ? (
+                        <span className="ml-auto bg-white text-black text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </nav>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
         {/* --- TABS --- */}
 
         {/* Dashboard */}
         {activeTab === 'dashboard' && (
           <div className="space-y-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-8">
               <StatCard label="Revenue" value={formatPrice(orders.reduce((s, o) => s + o.total, 0))} icon={DollarSign} trend="+12%" />
               <StatCard label="Orders" value={orders.length} icon={ShoppingBag} trend="+5" />
-              <StatCard label="Inventory" value={products.length} icon={Package} trend="Stable" />
-              <StatCard label="Cost Analysis" value={formatPrice(products.reduce((s, p) => s + ((p.manufacturingCost || 0) * (p.stock || 0)), 0))} icon={Zap} trend="Live" />
-              <StatCard label="Customers" value="1.5k" icon={Users} trend="+8%" />
+              <StatCard label="Inventory" value={products.reduce((s, p) => s + (p.stock || 0), 0)} icon={Package} trend="Stable" />
+              <StatCard label="Analysis" value={formatPrice(products.reduce((s, p) => s + ((p.manufacturingCost || 0) * (p.stock || 0)), 0))} icon={Zap} trend="Live" />
+              <StatCard label="Customers" value={new Set(orders.map(o => o.customerEmail)).size} icon={Users} trend="Active" />
+              <StatCard label="Traffic" value={traffic.length} icon={Users} trend="Live" />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-8 lg:col-span-1">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-brand-red mb-8">Recent Traffic</h3>
                   <div className="space-y-6">
-                    {orders.slice(0, 5).map(o => (
-                      <div key={o.id} className="flex justify-between items-center">
+                    {traffic.slice(0, 8).map(t => (
+                      <div key={t.id} className="flex justify-between items-center text-[10px]">
+                        <div className="truncate max-w-[150px]">
+                          <p className="font-bold text-white uppercase tracking-tighter truncate">{t.path}</p>
+                          <p className="opacity-40">{new Date(t.timestamp).toLocaleTimeString()}</p>
+                        </div>
+                        <p className="font-mono text-brand-muted shrink-0 ml-2">{t.referrer}</p>
+                      </div>
+                    ))}
+                    {traffic.length === 0 && <p className="text-[10px] text-brand-muted uppercase text-center py-4">No active nodes...</p>}
+                  </div>
+               </div>
+               <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-8 lg:col-span-1">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-brand-red mb-8">Recent Orders</h3>
+                  <div className="space-y-6">
+                    {orders.slice(0, 8).map(o => (
+                      <div key={o.id} className="flex justify-between items-center text-[10px]">
                         <div>
-                          <p className="font-bold text-sm">{o.customerName}</p>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">{o.id.slice(0, 8)}</p>
+                          <p className="font-bold text-white uppercase truncate">{o.customerName}</p>
+                          <p className="opacity-40">{o.id.slice(0, 8)}</p>
                         </div>
                         <p className="font-mono font-bold text-brand-red">{formatPrice(o.total)}</p>
                       </div>
                     ))}
+                    {orders.length === 0 && <p className="text-[10px] text-brand-muted uppercase text-center py-4">No transactions logged...</p>}
                   </div>
                </div>
-               <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-8">
+               <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-8 lg:col-span-1">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-brand-red mb-8">Low Stock Alerts</h3>
                   <div className="space-y-6">
                     {products.filter(p => p.stock < 10).slice(0, 5).map(p => (
                       <div key={p.id} className="flex justify-between items-center text-sm">
                         <div className="flex items-center gap-3">
-                           <img src={p.image} className="w-10 h-10 rounded-xl object-cover" />
-                           <p className="font-bold">{p.name}</p>
+                           <img 
+                             src={(p.image && !p.image.includes('fbcdn.net')) ? p.image : getProductFallbackImage(p.name, p.category)} 
+                             onError={(e) => handleImageError(e, getProductFallbackImage(p.name, p.category))}
+                             className="w-10 h-10 rounded-xl object-cover" 
+                           />
+                           <p className="font-bold text-[10px] uppercase truncate max-w-[80px]">{p.name}</p>
                         </div>
-                        <span className="text-brand-red font-black font-mono">{p.stock} units</span>
+                        <span className="text-brand-red font-black font-mono text-[10px]">{p.stock} units</span>
                       </div>
                     ))}
                   </div>
@@ -339,7 +482,11 @@ export default function AdminPanel() {
             {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => (
               <div key={p.id} className="bg-brand-card/50 border border-white/5 rounded-3xl overflow-hidden group">
                 <div className="aspect-[3/4] relative overflow-hidden bg-brand-bg">
-                  <img src={p.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                  <img 
+                    src={(p.image && !p.image.includes('fbcdn.net')) ? p.image : getProductFallbackImage(p.name, p.category)} 
+                    onError={(e) => handleImageError(e, getProductFallbackImage(p.name, p.category))}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                  />
                   <div className="absolute top-4 right-4 flex gap-2">
                     <button onClick={() => openEditProduct(p)} className="p-3 bg-white/20 backdrop-blur-xl rounded-full hover:bg-brand-red text-white"><Edit2 size={16} /></button>
                     <button onClick={() => handleDuplicateProduct(p)} className="p-3 bg-white/20 backdrop-blur-xl rounded-full hover:bg-brand-red text-white"><Copy size={16} /></button>
@@ -427,7 +574,15 @@ export default function AdminPanel() {
                  </tr>
                </thead>
                <tbody className="divide-y divide-white/5">
-                 {orders.map(o => (
+                 {orders
+                   .filter(o => {
+                     const q = searchQuery.toLowerCase();
+                     const id = (o.id || "").toLowerCase();
+                     const name = (o.customerName || "").toLowerCase();
+                     const email = (o.customerEmail || "").toLowerCase();
+                     return id.includes(q) || name.includes(q) || email.includes(q);
+                   })
+                   .map(o => (
                    <tr key={o.id} className="text-xs hover:bg-white/[0.01]">
                      <td className="p-6 font-mono text-[10px] opacity-40">{o.id.slice(0, 8)}</td>
                      <td className="p-6 font-bold">{o.customerName}</td>
@@ -435,7 +590,7 @@ export default function AdminPanel() {
                      <td className="p-6">
                         <select 
                           value={o.status}
-                          onChange={(e) => updateOrder({ ...o, status: e.target.value as any })}
+                          onChange={(e) => firebaseOps.updateOrder(o.id, { status: e.target.value as any })}
                           className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase outline-none"
                         >
                           <option value="pending">Pending</option>
@@ -850,9 +1005,151 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {/* Newsletter Tab */}
+        {activeTab === 'newsletter' && (
+          <div className="space-y-8">
+            <div className="bg-brand-card/30 border border-white/5 rounded-[40px] p-12">
+               <div className="flex justify-between items-center mb-12">
+                  <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red flex items-center gap-4">
+                     <Mail size={24} /> Subscriber Registry
+                  </h3>
+                  <div className="bg-white/5 rounded-2xl px-6 py-3 border border-white/10">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Total Nodes: <span className="text-white">{subscribers.length}</span></p>
+                  </div>
+               </div>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 {subscribers.map((sub, i) => (
+                   <motion.div
+                     key={sub.id}
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     transition={{ delay: i * 0.05 }}
+                     className="bg-black/20 border border-white/5 p-6 rounded-3xl"
+                   >
+                     <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-brand-red/10 flex items-center justify-center text-brand-red">
+                           <Users size={18} />
+                        </div>
+                        <div>
+                           <p className="font-bold text-sm truncate">{sub.email}</p>
+                           <p className="text-[8px] font-black uppercase tracking-widest text-brand-muted">
+                              Joined: {sub.subscribedAt?.toDate ? sub.subscribedAt.toDate().toLocaleDateString() : 'Archive'}
+                           </p>
+                        </div>
+                     </div>
+                   </motion.div>
+                 ))}
+               </div>
+               
+               {subscribers.length === 0 && (
+                 <div className="text-center py-24 opacity-20">
+                    <Mail size={48} className="mx-auto mb-4" />
+                    <p className="font-black uppercase tracking-widest text-[10px]">No active subscriptions detected</p>
+                 </div>
+               )}
+            </div>
+          </div>
+        )}
+
         {/* System Configuration View */}
         {activeTab === 'config' && (
            <div className="max-w-4xl mx-auto space-y-12 pb-24">
+              {/* General Protocol */}
+              <div className="bg-brand-card/40 border border-white/5 rounded-[40px] p-12">
+                 <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red mb-12 flex items-center gap-4">
+                    <Monitor size={24} /> General Protocol
+                 </h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Platform Name</label>
+                       <input 
+                          value={tempSiteConfig.name || ''}
+                          onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, name: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                       />
+                    </div>
+                    <div className="space-y-4">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Logo Text</label>
+                       <input 
+                          value={tempSiteConfig.logoText || ''}
+                          onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, logoText: e.target.value })}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none shadow-inner"
+                       />
+                    </div>
+                    <div className="space-y-4 md:col-span-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Favicon URL (Architectural Identity Link)</label>
+                       <input 
+                          value={tempSiteConfig.faviconUrl || ''}
+                          onChange={(e) => setTempSiteConfig({ ...tempSiteConfig, faviconUrl: e.target.value })}
+                          placeholder="https://example.com/favicon.png"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                       />
+                       <p className="text-[9px] text-brand-muted uppercase tracking-wider px-2 italic">Standard square image (32x32px or 64x64px recommended for clear rendering)</p>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Cookie Consent Settings */}
+              <div className="bg-brand-card/40 border border-white/5 rounded-[40px] p-12">
+                 <div className="flex items-center justify-between mb-12">
+                    <h3 className="text-sm font-black uppercase tracking-[0.5em] text-brand-red flex items-center gap-4">
+                       <Shield size={24} /> Cookie Consent Protocol
+                    </h3>
+                    <button 
+                       onClick={() => setTempSiteConfig({ 
+                         ...tempSiteConfig, 
+                         cookieConsent: { 
+                           ...(tempSiteConfig.cookieConsent || {}), 
+                           enabled: !tempSiteConfig.cookieConsent?.enabled 
+                         } 
+                       } as any)}
+                       className={cn(
+                         "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                         tempSiteConfig.cookieConsent?.enabled ? "bg-green-500 text-white" : "bg-brand-red text-white"
+                       )}
+                    >
+                       {tempSiteConfig.cookieConsent?.enabled ? 'Protocol Active' : 'Protocol Suspended'}
+                    </button>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Consent Title</label>
+                       <input 
+                          value={tempSiteConfig.cookieConsent?.title || ''}
+                          onChange={(e) => setTempSiteConfig({ 
+                            ...tempSiteConfig, 
+                            cookieConsent: { ...(tempSiteConfig.cookieConsent || {}), title: e.target.value } as any
+                          })}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                       />
+                    </div>
+                    <div className="space-y-4">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Accept Button Text</label>
+                       <input 
+                          value={tempSiteConfig.cookieConsent?.acceptText || ''}
+                          onChange={(e) => setTempSiteConfig({ 
+                            ...tempSiteConfig, 
+                            cookieConsent: { ...(tempSiteConfig.cookieConsent || {}), acceptText: e.target.value } as any
+                          })}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none"
+                       />
+                    </div>
+                    <div className="md:col-span-2 space-y-4">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Consent Message</label>
+                       <textarea 
+                          value={tempSiteConfig.cookieConsent?.message || ''}
+                          onChange={(e) => setTempSiteConfig({ 
+                            ...tempSiteConfig, 
+                            cookieConsent: { ...(tempSiteConfig.cookieConsent || {}), message: e.target.value } as any
+                          })}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm leading-relaxed resize-none h-24 focus:border-brand-red outline-none"
+                       />
+                    </div>
+                 </div>
+              </div>
+
               {/* AI Assistant Config */}
               <div className="bg-brand-card/40 border border-white/5 rounded-[40px] p-12">
                  <div className="flex items-center justify-between mb-8">
@@ -1135,9 +1432,42 @@ export default function AdminPanel() {
                            <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Identity Asset (Main Image)</label>
                            <input name="image" required defaultValue={editingProduct?.image} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-mono" />
                         </div>
-                        <div className="space-y-1">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Asset Array (Comma Separated)</label>
-                           <textarea name="images" rows={3} required defaultValue={editingProduct?.images.join(', ')} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-mono" />
+                        <div className="space-y-3">
+                           <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Asset Array (Multiple Images)</label>
+                              <button 
+                                type="button"
+                                onClick={() => setTempImages([...tempImages, ''])}
+                                className="text-[8px] bg-brand-red px-2 py-1 rounded-lg text-white font-black uppercase tracking-widest hover:bg-brand-accent-dark transition-all"
+                              >
+                                Add Frame
+                              </button>
+                           </div>
+                           <div className="space-y-2 max-h-[150px] overflow-y-auto no-scrollbar pr-2">
+                             {tempImages.map((img, idx) => (
+                               <div key={idx} className="flex gap-2">
+                                  <input 
+                                    value={img}
+                                    onChange={(e) => {
+                                      const newImgs = [...tempImages];
+                                      newImgs[idx] = e.target.value;
+                                      setTempImages(newImgs);
+                                    }}
+                                    placeholder="https://asset-url.com/image.jpg"
+                                    className="flex-grow bg-white/5 border border-white/10 rounded-xl p-3 text-[10px] font-mono outline-none focus:border-brand-red"
+                                  />
+                                  {tempImages.length > 1 && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => setTempImages(tempImages.filter((_, i) => i !== idx))}
+                                      className="p-3 bg-white/5 border border-white/10 rounded-xl text-brand-muted hover:text-brand-red transition-all"
+                                    >
+                                      <Trash size={14} />
+                                    </button>
+                                  )}
+                               </div>
+                             ))}
+                           </div>
                         </div>
                         <div className="space-y-1">
                            <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Classification Matrix</label>

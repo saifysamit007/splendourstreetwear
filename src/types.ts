@@ -43,6 +43,7 @@ export interface OrderItem {
   price: number;
   originalPrice: number; // To track if it was discounted
   quantity: number;
+  selectedSize?: string;
 }
 
 export interface Order {
@@ -71,6 +72,7 @@ export interface Order {
 }
 
 export interface SiteConfig {
+  name: string;
   logoText: string;
   navbarLinks: { name: string, href: string }[];
   footer: {
@@ -95,6 +97,7 @@ export interface SiteConfig {
     notes: string;
   };
   isChatbotEnabled: boolean;
+  faviconUrl?: string;
   storyVideos?: {
     hero: string;
     crafting: string;
@@ -153,6 +156,14 @@ export interface ContactMessage {
   createdAt: string;
 }
 
+export interface TrafficRecord {
+  id: string;
+  timestamp: string;
+  path: string;
+  referrer?: string;
+  userAgent?: string;
+}
+
 export interface StoreState {
   products: Product[];
   setProducts: (products: Product[]) => void;
@@ -182,6 +193,10 @@ export interface StoreState {
   messages: ContactMessage[];
   setMessages: (messages: ContactMessage[]) => void;
   updateMessageStatus: (id: string, status: ContactMessage['status']) => void;
+  subscribers: any[];
+  setSubscribers: (subscribers: any[]) => void;
+  traffic: TrafficRecord[];
+  setTraffic: (traffic: TrafficRecord[]) => void;
   addToCart: (product: Product) => void;
   removeFromCart: (id: string) => void;
   updateCartQuantity: (id: string, quantity: number) => void;

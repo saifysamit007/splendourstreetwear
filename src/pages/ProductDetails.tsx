@@ -13,6 +13,7 @@ import SEO from '../components/SEO';
 import { cn } from '../lib/utils';
 import ProductReviews from '../components/ProductReviews';
 import SizeGuidePopup from '../components/SizeGuidePopup';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -48,8 +49,19 @@ export default function ProductDetails() {
     );
   }
 
-  const nextImage = () => setActiveImage((prev) => (prev + 1) % product.images.length);
-  const prevImage = () => setActiveImage((prev) => (prev - 1 + product.images.length) % product.images.length);
+  const nextImage = () => {
+    if (product.images.length === 0) return;
+    setActiveImage((prev) => (prev + 1) % product.images.length);
+  };
+  const prevImage = () => {
+    if (product.images.length === 0) return;
+    setActiveImage((prev) => (prev - 1 + product.images.length) % product.images.length);
+  };
+
+  const fallbackImg = getProductFallbackImage(product.name, product.category);
+  const rawImages = (product.images && product.images.length > 0) ? product.images : (product.image ? [product.image] : []);
+  const validImages = rawImages.filter(img => img && !img.includes('fbcdn.net'));
+  const imagesToDisplay = validImages.length > 0 ? validImages : [fallbackImg];
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -97,14 +109,25 @@ export default function ProductDetails() {
               <AnimatePresence mode="wait">
                 <motion.img
                   key={activeImage}
-                  src={product.images[activeImage]}
+                  src={imagesToDisplay[activeImage % imagesToDisplay.length]}
                   alt={product.name}
                   initial={{ opacity: 0, scale: 1.1 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover touch-none cursor-grab active:cursor-grabbing"
+                  onError={(e) => handleImageError(e as any, fallbackImg)}
                   referrerPolicy="no-referrer"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  onDragEnd={(_, info) => {
+                    const threshold = 50;
+                    if (info.offset.x > threshold) {
+                      prevImage();
+                    } else if (info.offset.x < -threshold) {
+                      nextImage();
+                    }
+                  }}
                 />
               </AnimatePresence>
               
@@ -116,7 +139,7 @@ export default function ProductDetails() {
                 </div>
               )}
 
-              {product.images.length > 1 && (
+              {imagesToDisplay.length > 1 && (
                 <>
                   <button 
                     onClick={prevImage}
@@ -134,9 +157,9 @@ export default function ProductDetails() {
               )}
             </div>
 
-            {product.images.length > 1 && (
+            {imagesToDisplay.length > 1 && (
               <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-                {product.images.map((img, idx) => (
+                {imagesToDisplay.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImage(idx)}
@@ -145,7 +168,7 @@ export default function ProductDetails() {
                       activeImage === idx ? "border-brand-red scale-105 shadow-lg shadow-brand-red/20" : "border-white/5 hover:border-white/20"
                     )}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={img} alt="" className="w-full h-full object-cover" onError={(e) => handleImageError(e, fallbackImg)} referrerPolicy="no-referrer" />
                   </button>
                 ))}
               </div>
@@ -178,7 +201,7 @@ export default function ProductDetails() {
               <Markdown remarkPlugins={[remarkGfm]}>{product.description}</Markdown>
             </div>
 
-            <div className="space-y-10">
+            <div className="space-y-10 mb-10 lg:mb-0">
               {/* Size Selection */}
               {product.sizes && product.sizes.length > 0 && (
                 <div>
@@ -191,7 +214,7 @@ export default function ProductDetails() {
                       Size Guide
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2 md:gap-3">
                     {product.sizes.map(size => {
                       const sizeStock = product.sizeStock?.[size];
                       const isOutOfStock = sizeStock !== undefined ? sizeStock === 0 : product.stock === 0;
@@ -202,17 +225,14 @@ export default function ProductDetails() {
                           onClick={() => setSelectedSize(size)}
                           disabled={isOutOfStock}
                           className={cn(
-                            "group relative w-14 h-14 rounded-xl border flex flex-col items-center justify-center transition-all",
+                            "group relative w-12 h-12 md:w-14 md:h-14 rounded-xl border flex flex-col items-center justify-center transition-all",
                             selectedSize === size 
                               ? "bg-brand-red text-white border-brand-red" 
                               : "bg-transparent border-white/10 text-brand-muted hover:border-white/30",
                             isOutOfStock && "opacity-30 cursor-not-allowed grayscale"
                           )}
                         >
-                          <span className="text-sm font-black uppercase">{size}</span>
-                          {sizeStock !== undefined && sizeStock > 0 && sizeStock < 5 && (
-                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-brand-red rounded-full border-2 border-brand-bg md:hidden" />
-                          )}
+                          <span className="text-xs md:text-sm font-black uppercase">{size}</span>
                         </button>
                       );
                     })}
@@ -271,7 +291,7 @@ export default function ProductDetails() {
                   <button 
                     onClick={() => toggleFavorite(product.id)}
                     className={cn(
-                      "p-5 border border-white/10 rounded-2xl transition-all active:scale-95",
+                      "flex-1 md:flex-none p-5 border border-white/10 rounded-2xl transition-all active:scale-95 flex items-center justify-center",
                       isFavorite ? "bg-brand-red text-white border-brand-red" : "bg-white/5 text-white hover:bg-white/10"
                     )}
                   >
@@ -279,9 +299,45 @@ export default function ProductDetails() {
                   </button>
                   <button 
                     onClick={() => setIsShareModalOpen(true)}
-                    className="p-5 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-all active:scale-95"
+                    className="flex-1 md:flex-none p-5 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center"
                   >
                     <Share2 size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sticky Mobile Buy Bar */}
+              <div className="fixed bottom-0 left-0 right-0 z-[100] md:hidden">
+                <div className="bg-brand-bg/80 backdrop-blur-xl border-t border-white/5 p-4 flex items-center gap-4">
+                  <div className="flex-grow">
+                    <button 
+                      onClick={() => addToCart(product)}
+                      disabled={currentStock === 0 || (product.sizes?.length > 0 && !selectedSize)}
+                      className={cn(
+                        "w-full font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95",
+                        currentStock > 0 
+                          ? "bg-brand-red text-white" 
+                          : "bg-white/5 text-brand-muted border border-white/10"
+                      )}
+                    >
+                      <ShoppingBag size={18} />
+                      <span className="uppercase tracking-widest text-[10px]">
+                        {currentStock > 0 
+                          ? (product.sizes?.length > 0 && !selectedSize)
+                            ? "Select Size"
+                            : "Add to Cart"
+                          : "Sold Out"}
+                      </span>
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => toggleFavorite(product.id)}
+                    className={cn(
+                      "p-4 border border-white/10 rounded-xl transition-all active:scale-95",
+                      isFavorite ? "bg-brand-red text-white" : "bg-white/5"
+                    )}
+                  >
+                    <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
                   </button>
                 </div>
               </div>

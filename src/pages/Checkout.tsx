@@ -16,7 +16,7 @@ import { cn } from '../lib/utils';
 import { Order } from '../types';
 import SEO from '../components/SEO';
 import Invoice from '../components/Invoice';
-import BKashModal from '../components/BKashModal';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 type Step = 'shipping' | 'payment' | 'confirmation';
 
@@ -34,6 +34,7 @@ export default function Checkout() {
   // Form State
   const [shippingInfo, setShippingInfo] = useState({
     name: auth.currentUser?.displayName || '',
+    email: auth.currentUser?.email || '',
     phone: '',
     address: '',
     city: '',
@@ -49,12 +50,12 @@ export default function Checkout() {
     transactionId: ''
   });
 
-  const [isBKashModalOpen, setIsBKashModalOpen] = useState(false);
-
   const subtotal = cart.reduce((sum, item) => {
     const price = item.discountPrice || item.price;
     return sum + price * item.quantity;
   }, 0);
+
+  const [showSummaryMobile, setShowSummaryMobile] = useState(false);
 
   const handleApplyCoupon = () => {
     if (!couponCode.trim()) return;
@@ -130,7 +131,8 @@ export default function Checkout() {
   }, [cart, navigate, currentStep]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(BKASH_NUMBER);
+    const number = siteConfig.footer.bkashNumber || BKASH_NUMBER;
+    navigator.clipboard.writeText(number);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -139,7 +141,7 @@ export default function Checkout() {
     const finalBkashDetails = directDetails || bkashDetails;
     
     if (paymentMethod === 'bkash' && !finalBkashDetails.transactionId) {
-      setIsBKashModalOpen(true);
+      addNotification('Please enter the bKash Transaction ID', 'error');
       return;
     }
     
@@ -154,7 +156,7 @@ export default function Checkout() {
       id: orderId,
       userId: user?.uid || 'guest',
       customerName: shippingInfo.name,
-      customerEmail: user?.email || 'guest@example.com',
+      customerEmail: user?.email || shippingInfo.email || 'guest@example.com',
       customerPhone: shippingInfo.phone,
       shippingAddress: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postCode}`,
       billingAddress: shippingInfo.billingSame ? `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postCode}` : shippingInfo.billingAddress,
@@ -167,15 +169,15 @@ export default function Checkout() {
       })),
       subtotal: subtotal,
       couponDiscount: couponDiscount,
-      couponCode: appliedCoupon?.code,
+      couponCode: appliedCoupon?.code || null,
       total: total,
       deliveryCharge: deliveryCharge,
       shippingRegion: shippingInfo.shippingRegion,
       status: 'pending',
       createdAt: new Date().toISOString(),
       invoiceId: `${siteConfig.invoice.prefix}${Math.floor(1000 + Math.random() * 9000)}`,
-      paymentMethod: paymentMethod,
-      paymentDetails: paymentMethod === 'bkash' ? finalBkashDetails : undefined
+      paymentMethod: paymentMethod === 'COD' ? 'COD' : 'bkash',
+      paymentDetails: paymentMethod === 'bkash' ? finalBkashDetails : null
     };
 
     // Update stock levels
@@ -189,8 +191,10 @@ export default function Checkout() {
     addOrder(newOrder);
     try {
       await firebaseOps.createOrder(newOrder);
+      addNotification("Order successful. Accessing confirmation protocol...", "success");
     } catch (error) {
       console.error("Order sync failure", error);
+      addNotification("Sync error: Order logged locally, but node rejected cloud handshake.", "error");
     }
     
     setLastOrder(newOrder);
@@ -263,6 +267,65 @@ export default function Checkout() {
       <SEO title="Checkout | Splendour Architecture" />
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-12">
         
+        {/* Mobile Summary Toggle */}
+        <div className="lg:hidden w-full mb-6">
+           <button 
+            onClick={() => setShowSummaryMobile(!showSummaryMobile)}
+            className="w-full flex items-center justify-between p-6 bg-brand-card border border-white/10 rounded-3xl"
+           >
+              <div className="flex items-center gap-3">
+                 <ShoppingBag size={20} className="text-brand-red" />
+                 <span className="text-sm font-black uppercase tracking-widest">
+                    {showSummaryMobile ? 'Hide Summary' : 'Show Summary'}
+                 </span>
+              </div>
+              <span className="text-lg font-display font-black italic text-brand-red">{formatPrice(total)}</span>
+           </button>
+           
+           <AnimatePresence>
+              {showSummaryMobile && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden mt-4"
+                >
+                   <div className="bg-brand-card border border-white/5 rounded-3xl p-6 space-y-6">
+                      <div className="space-y-4 max-h-[200px] overflow-y-auto no-scrollbar">
+                         {cart.map((item) => (
+                           <div key={item.id} className="flex gap-4">
+                              <div className="w-12 h-16 bg-white/5 rounded-lg overflow-hidden shrink-0">
+                                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-grow">
+                                 <h4 className="text-xs font-bold truncate">{item.name}</h4>
+                                 <p className="text-[10px] text-brand-muted uppercase tracking-widest">{item.quantity} Units &bull; {formatPrice(item.price * item.quantity)}</p>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                      <div className="space-y-3 pt-4 border-t border-white/5">
+                         <div className="flex justify-between text-xs">
+                            <span className="text-brand-muted">Market Total</span>
+                            <span className="font-mono font-bold">{formatPrice(subtotal)}</span>
+                         </div>
+                         {appliedCoupon && (
+                           <div className="flex justify-between text-xs text-green-500">
+                              <span>Architectural Discount</span>
+                              <span>-{formatPrice(couponDiscount)}</span>
+                           </div>
+                         )}
+                         <div className="flex justify-between text-xs">
+                            <span className="text-brand-muted">Logistics</span>
+                            <span className="font-mono font-bold">{formatPrice(deliveryCharge)}</span>
+                         </div>
+                      </div>
+                   </div>
+                </motion.div>
+              )}
+           </AnimatePresence>
+        </div>
+
         {/* Left Side: Checkout Flow */}
         <div className="flex-grow space-y-12">
           {/* Progress Indicator */}
@@ -311,6 +374,16 @@ export default function Checkout() {
                         value={shippingInfo.name}
                         onChange={(e) => setShippingInfo({ ...shippingInfo, name: e.target.value })}
                         placeholder="Full Name"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none focus:bg-white/10 transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted px-2">Email Address</label>
+                       <input 
+                        type="email"
+                        value={shippingInfo.email}
+                        onChange={(e) => setShippingInfo({ ...shippingInfo, email: e.target.value })}
+                        placeholder="email@example.com"
                         className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold focus:border-brand-red outline-none focus:bg-white/10 transition-all"
                        />
                     </div>
@@ -377,7 +450,7 @@ export default function Checkout() {
                   <div className="pt-6">
                     <button 
                       onClick={() => setCurrentStep('payment')}
-                      disabled={!shippingInfo.name || !shippingInfo.address || !shippingInfo.phone || !shippingInfo.city}
+                      disabled={!shippingInfo.name || !shippingInfo.email || !shippingInfo.address || !shippingInfo.phone || !shippingInfo.city}
                       className="w-full bg-white text-black py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs hover:bg-brand-red hover:text-white transition-all shadow-2xl flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed group"
                     >
                       Continue to Payment <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -467,45 +540,68 @@ export default function Checkout() {
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-black/30 border border-brand-red/20 rounded-[40px] p-12 space-y-8 text-center"
+                      className="bg-black/30 border border-brand-red/20 rounded-[40px] p-8 md:p-12 space-y-8"
                     >
-                       <div className="w-20 h-20 bg-brand-red/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-brand-red/20 shadow-[0_0_50px_rgba(226,19,110,0.1)]">
-                          <img 
-                            src="https://www.logo.wine/a/logo/BKash/BKash-Logo.wine.svg" 
-                            alt="bKash" 
-                            className="h-10 object-contain brightness-0 invert"
-                          />
+                       <div className="flex flex-col md:flex-row items-center gap-6 justify-between border-b border-white/5 pb-8">
+                          <div className="text-left">
+                             <h3 className="text-xl font-display font-black italic uppercase tracking-tighter mb-1 text-brand-red">Personal bKash Protocol</h3>
+                             <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Manually transfer the total amount below</p>
+                          </div>
+                          <div className="flex flex-col items-end">
+                             <span className="text-xs font-black uppercase tracking-widest text-brand-muted mb-2">Manual Transfer Total</span>
+                             <span className="text-3xl font-display font-black italic text-white">{formatPrice(total)}</span>
+                          </div>
                        </div>
                        
-                       <div>
-                          <h3 className="text-2xl font-display font-black italic uppercase tracking-tighter mb-2">Automated Gateway</h3>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-muted max-w-xs mx-auto">
-                            The Splendour system is connected to a secure bKash direct API protocol. 
-                          </p>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="space-y-4 text-left">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">1. Transfer Protocol</label>
+                             <div className="flex bg-white/5 border border-white/10 rounded-2xl p-4 items-center justify-between">
+                                <span className="font-mono font-bold text-lg">{siteConfig.footer.bkashNumber || BKASH_NUMBER}</span>
+                                <button 
+                                  onClick={handleCopy}
+                                  className="p-2 bg-brand-red/20 text-brand-red rounded-lg hover:bg-brand-red hover:text-white transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                >
+                                  {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+                                </button>
+                             </div>
+                             <p className="text-[10px] text-brand-muted italic uppercase tracking-wider">Send Money to this personal account.</p>
+                          </div>
+
+                          <div className="space-y-6">
+                            <div className="space-y-2 text-left">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted px-2">Your bKash Number</label>
+                               <input 
+                                  value={bkashDetails.bkashNumber}
+                                  onChange={(e) => setBkashDetails({ ...bkashDetails, bkashNumber: e.target.value })}
+                                  placeholder="01XXXXXXXXX"
+                                  className="w-full bg-white/10 border border-white/10 rounded-2xl p-5 text-sm font-mono font-black focus:border-brand-red outline-none transition-all"
+                               />
+                            </div>
+                            <div className="space-y-2 text-left">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted px-2">Transaction ID (TrxID)</label>
+                               <input 
+                                  value={bkashDetails.transactionId}
+                                  onChange={(e) => setBkashDetails({ ...bkashDetails, transactionId: e.target.value.toUpperCase() })}
+                                  placeholder="8XJ42K9L..."
+                                  className="w-full bg-white/10 border border-brand-red/30 rounded-2xl p-5 text-sm font-mono font-black placeholder:text-white/20 focus:border-brand-red outline-none transition-all uppercase"
+                               />
+                            </div>
+                          </div>
                        </div>
 
-                       {bkashDetails.transactionId ? (
-                         <div className="bg-brand-red/10 border border-brand-red/30 rounded-3xl p-6 flex flex-col items-center gap-2">
-                            <div className="flex items-center gap-2 text-green-500 font-black uppercase tracking-widest text-[10px]">
-                               <CheckCircle2 size={14} /> Protocol Verified
-                            </div>
-                            <p className="text-lg font-mono font-black text-white">{bkashDetails.transactionId}</p>
-                         </div>
-                       ) : (
-                         <button 
-                           onClick={() => setIsBKashModalOpen(true)}
-                           className="bg-brand-red text-white px-12 py-5 rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-white hover:text-black transition-all shadow-2xl flex items-center justify-center gap-3 mx-auto group"
-                         >
-                            <Smartphone size={18} className="group-hover:translate-y-[-2px] transition-transform" />
-                            Open Automated bKash Terminal
-                         </button>
-                       )}
+                       <div className="pt-4 flex items-start gap-4 p-6 bg-brand-red/5 border border-brand-red/10 rounded-3xl text-left">
+                          <AlertCircle size={20} className="text-brand-red shrink-0" />
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-muted leading-relaxed">
+                             Transaction verification is essential for order log activation. Ensure the TRX ID is accurate to prevent synchronization failure.
+                          </p>
+                       </div>
                     </motion.div>
                   )}
 
                   <div className="pt-6">
                     <button 
-                      onClick={handlePlaceOrder}
+                      onClick={() => handlePlaceOrder()}
                       disabled={loading || (paymentMethod === 'bkash' && (!bkashDetails.bkashNumber || !bkashDetails.transactionId))}
                       className="w-full bg-brand-red text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs hover:bg-brand-accent-dark transition-all shadow-2xl flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
@@ -526,7 +622,7 @@ export default function Checkout() {
         </div>
 
         {/* Right Side: Order Summary */}
-        <div className="w-full lg:w-[450px]">
+        <div className="hidden lg:block w-full lg:w-[450px]">
            <div className="bg-brand-card border border-white/5 rounded-[40px] p-8 lg:p-12 sticky top-32">
               <h3 className="text-xl font-display font-black italic uppercase tracking-tighter mb-8 pb-4 border-b border-white/5">Order Blueprint</h3>
               
@@ -534,7 +630,12 @@ export default function Checkout() {
                  {cart.map((item) => (
                    <div key={item.id} className="flex gap-4">
                       <div className="w-16 h-20 bg-white/5 rounded-xl border border-white/5 overflow-hidden flex-shrink-0">
-                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                         <img 
+                           src={(item.image && !item.image.includes('fbcdn.net')) ? item.image : getProductFallbackImage(item.name, item.category)} 
+                           alt={item.name} 
+                           onError={(e) => handleImageError(e, getProductFallbackImage(item.name, item.category))}
+                           className="w-full h-full object-cover" 
+                         />
                       </div>
                       <div className="flex-grow">
                          <h4 className="text-sm font-bold line-clamp-1">{item.name}</h4>
@@ -612,18 +713,6 @@ export default function Checkout() {
         </div>
 
       </div>
-      {/* bKash Automated Gateway Modal */}
-      <BKashModal 
-        isOpen={isBKashModalOpen}
-        onClose={() => setIsBKashModalOpen(false)}
-        total={total}
-        onSuccess={(details) => {
-          setBkashDetails(details);
-          setIsBKashModalOpen(false);
-          // Directly pass details to avoid state race
-          handlePlaceOrder(details);
-        }}
-      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth
 import AuthModal from './AuthModal';
 import CartDrawer from './CartDrawer';
 import { useStore } from '../store/useStore';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -80,19 +81,19 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link to="/" className="text-2xl font-display font-black tracking-tighter text-white uppercase">
-              SPLENDOUR<span className="text-brand-red ml-0.5">.</span>
+              {siteConfig?.logoText || 'SPLENDOUR'}<span className="text-brand-red ml-0.5">.</span>
             </Link>
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8">
-            {[
+          <div className="hidden lg:flex items-center space-x-8">
+            {(siteConfig?.navbarLinks && siteConfig.navbarLinks.length > 0 ? siteConfig.navbarLinks : [
               { name: 'Home', href: '/' },
               { name: 'Shop', href: '/shop' },
               { name: 'Collections', href: '/info/collections' },
               { name: 'Lookbook', href: '/info/lookbook' },
               { name: 'About', href: '/info/our-story' }
-            ].map((link) => (
+            ]).map((link) => (
               <Link
                 key={link.name}
                 to={link.href}
@@ -115,13 +116,13 @@ export default function Navbar() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="hidden lg:flex items-center space-x-6">
             <div className="relative flex items-center">
               <AnimatePresence>
                 {isSearchOpen && (
                   <motion.input
                     initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 200, opacity: 1 }}
+                    animate={{ width: 220, opacity: 1 }}
                     exit={{ width: 0, opacity: 0 }}
                     type="text"
                     placeholder="Search..."
@@ -133,7 +134,7 @@ export default function Navbar() {
                         setIsSearchOpen(false);
                       }
                     }}
-                    className="bg-white/5 border border-white/10 rounded-full px-4 py-1 text-sm focus:outline-none focus:border-brand-red mr-2"
+                    className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-brand-red mr-2"
                   />
                 )}
               </AnimatePresence>
@@ -145,7 +146,7 @@ export default function Navbar() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 top-full mt-4 w-72 bg-brand-card border border-white/10 rounded-2xl p-2 shadow-2xl z-[110]"
+                    className="absolute right-0 top-full mt-4 w-80 bg-brand-card border border-white/10 rounded-2xl p-2 shadow-2xl z-[110]"
                   >
                     <div className="text-[10px] font-black uppercase tracking-widest text-brand-muted p-3 border-b border-white/5 mb-1">
                       Matched Pieces
@@ -161,7 +162,12 @@ export default function Navbar() {
                         className="w-full flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-all group"
                       >
                         <div className="w-12 h-16 bg-white/5 rounded-lg overflow-hidden shrink-0 border border-white/5">
-                          <img src={product.image} alt={product.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                          <img 
+                            src={(product.image && !product.image.includes('fbcdn.net')) ? product.image : getProductFallbackImage(product.name, product.category)} 
+                            alt={product.name} 
+                            onError={(e) => handleImageError(e, getProductFallbackImage(product.name, product.category))}
+                            className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" 
+                          />
                         </div>
                         <div className="text-left overflow-hidden">
                           <p className="text-xs font-bold text-white truncate">{product.name}</p>
@@ -267,17 +273,17 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="md:hidden flex items-center space-x-4">
-            <button onClick={() => setCartOpen(true)} className="text-white relative">
-              <ShoppingCart size={20} />
+          <div className="lg:hidden flex items-center space-x-4">
+            <button onClick={() => setCartOpen(true)} className="text-white relative p-2">
+              <ShoppingCart size={22} />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-red text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute top-0 right-0 bg-brand-red text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </button>
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white">
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white p-2">
+              {mobileMenuOpen ? <X size={26} /> : <Menu size={26} />}
             </button>
           </div>
         </div>
@@ -291,13 +297,13 @@ export default function Navbar() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[-1] md:hidden"
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[-1] lg:hidden"
               />
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="absolute top-full left-0 right-0 bg-brand-bg md:hidden"
+                className="absolute top-full left-0 right-0 bg-brand-bg lg:hidden border-b border-white/5"
               >
               <div className="flex flex-col p-6 space-y-4">
                 <div className="relative mb-4">
@@ -337,7 +343,12 @@ export default function Navbar() {
                           className="w-full flex items-center gap-4 p-2 hover:bg-white/5 rounded-xl transition-all"
                         >
                           <div className="w-10 h-14 bg-white/10 rounded-lg overflow-hidden shrink-0">
-                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                            <img 
+                              src={(product.image && !product.image.includes('fbcdn.net')) ? product.image : getProductFallbackImage(product.name, product.category)} 
+                              alt={product.name} 
+                              onError={(e) => handleImageError(e, getProductFallbackImage(product.name, product.category))}
+                              className="w-full h-full object-cover" 
+                            />
                           </div>
                           <div className="text-left overflow-hidden">
                             <p className="text-xs font-bold text-white truncate">{product.name}</p>
@@ -348,13 +359,13 @@ export default function Navbar() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {[
+                {(siteConfig?.navbarLinks && siteConfig.navbarLinks.length > 0 ? siteConfig.navbarLinks : [
                   { name: 'Home', href: '/' },
                   { name: 'Shop', href: '/shop' },
                   { name: 'Collections', href: '/info/collections' },
                   { name: 'Lookbook', href: '/info/lookbook' },
                   { name: 'About', href: '/info/our-story' }
-                ].map((link) => (
+                ]).map((link) => (
                   <Link
                     key={link.name}
                     to={link.href}

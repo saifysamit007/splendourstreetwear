@@ -89,9 +89,9 @@ export default function Hero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-4xl md:text-8xl font-display font-black leading-tight mb-8 tracking-tighter"
+          className="text-3xl sm:text-4xl md:text-7xl lg:text-8xl font-display font-black leading-tight mb-8 tracking-tighter"
         >
-          WHERE STREET CULTURE <br />
+          WHERE STREET CULTURE <br className="hidden sm:block" />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-red to-brand-accent-dark">
             MEETS PREMIUM FASHION
           </span>
@@ -101,7 +101,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="max-w-2xl mx-auto text-lg md:text-xl text-brand-muted mb-12 leading-relaxed"
+          className="max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-brand-muted mb-12 leading-relaxed"
         >
           Experience the evolution of urban style. Splendour Streetwear combines raw street aesthetics with high-end craftsmanship for the modern icon.
         </motion.p>

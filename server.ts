@@ -18,9 +18,10 @@ async function startServer() {
     const token = process.env.INSTAGRAM_ACCESS_TOKEN;
     
     if (!token) {
-      return res.status(404).json({ 
-        error: 'INSTAGRAM_ACCESS_TOKEN not configured',
-        message: 'Please provide a valid Instagram Basic Display API Access Token in environment variables.'
+      return res.status(200).json({ 
+        data: [],
+        archiveMode: true,
+        message: 'INSTAGRAM_ACCESS_TOKEN not configured. Showing archive mode.'
       });
     }
 
@@ -30,14 +31,18 @@ async function startServer() {
       );
       
       if (!response.ok) {
-        throw new Error(`Instagram API responded with ${response.status}`);
+        // Return 200 with fallback indicator so client smoothly displays archive posts
+        return res.status(200).json({
+          data: [],
+          archiveMode: true,
+          message: 'Instagram token expired or invalid. Archive mode active.'
+        });
       }
 
       const data = await response.json();
       res.json(data);
     } catch (error) {
-      console.error('Instagram Fetch Error:', error);
-      res.status(500).json({ error: 'Failed to fetch Instagram feed' });
+      res.status(200).json({ data: [], archiveMode: true, message: 'Archive mode active' });
     }
   });
 

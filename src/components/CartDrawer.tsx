@@ -8,6 +8,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { auth } from '../firebase';
 import { Order } from '../types';
 import Invoice from './Invoice';
+import { firebaseOps } from '../lib/firebaseOps';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -162,14 +164,22 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 cart.map((item) => (
                   <div key={item.id} className="flex gap-4 group">
                     <div className="w-24 h-32 rounded-xl overflow-hidden bg-brand-bg flex-shrink-0 border border-white/5">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img 
+                        src={(item.image && !item.image.includes('fbcdn.net')) ? item.image : getProductFallbackImage(item.name, item.category)} 
+                        alt={item.name} 
+                        onError={(e) => handleImageError(e, getProductFallbackImage(item.name, item.category))}
+                        className="w-full h-full object-cover" 
+                      />
                     </div>
                     <div className="flex-grow flex flex-col justify-between py-1">
                       <div>
                         <div className="flex justify-between items-start mb-1">
                           <h4 className="font-bold text-sm group-hover:text-brand-red transition-colors">{item.name}</h4>
                           <button 
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => {
+                              removeFromCart(item.id);
+                              firebaseOps.logCartActivity(`${auth.currentUser?.displayName || 'A guest'} removed ${item.name} from their cart.`, 'remove');
+                            }}
                             className="text-brand-muted hover:text-brand-red transition-colors"
                           >
                             <Trash2 size={16} />

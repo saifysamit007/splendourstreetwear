@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '../constants';
 import { cn } from '../lib/utils';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 function ProductCard({ product }: { product: any }) {
   const { addToCart } = useStore();
@@ -17,6 +18,12 @@ function ProductCard({ product }: { product: any }) {
 
   const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
   const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
+
+  const productImage = (product.image && !product.image.includes('fbcdn.net'))
+    ? product.image
+    : (product.images?.[0] && !product.images[0].includes('fbcdn.net'))
+      ? product.images[0]
+      : getProductFallbackImage(product.name, product.category);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -46,17 +53,18 @@ function ProductCard({ product }: { product: any }) {
       }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="flex-shrink-0 w-[280px] md:w-[350px] snap-start group relative"
+      className="flex-shrink-0 w-[240px] md:w-[300px] lg:w-[350px] snap-start group relative"
     >
       <div 
         style={{ transform: "translateZ(30px)" }}
         className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-brand-card mb-6 shadow-2xl"
       >
         <img
-          src={product.image}
+          src={productImage}
           alt={product.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 cursor-pointer"
           onClick={() => navigate(`/product/${product.id}`)}
+          onError={(e) => handleImageError(e, getProductFallbackImage(product.name, product.category))}
           referrerPolicy="no-referrer"
         />
         
@@ -218,7 +226,7 @@ export default function FeaturedCollection() {
           className="flex overflow-x-auto gap-8 md:gap-12 px-6 md:px-20 pb-12 no-scrollbar snap-x snap-mandatory perspective-1000 cursor-grab active:cursor-grabbing relative z-40"
           style={{ 
             perspective: "1000px",
-            scrollPaddingLeft: '5rem'
+            scrollPaddingLeft: window.innerWidth < 768 ? '1.5rem' : '5rem'
           }}
         >
           {featuredProducts.map((product) => (

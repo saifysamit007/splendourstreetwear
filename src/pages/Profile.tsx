@@ -336,7 +336,7 @@ export default function Profile() {
                                className="w-24 h-24 rounded-xl overflow-hidden cursor-pointer"
                                onClick={() => navigate(`/product/${product.id}`)}
                              >
-                               <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                               <img src={product.image || product.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                              </div>
                              <div className="flex-grow flex flex-col justify-between">
                                 <div>

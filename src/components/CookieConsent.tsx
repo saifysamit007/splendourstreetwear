@@ -1,69 +1,89 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, X, Check } from 'lucide-react';
+import { ShieldCheck, X, Check } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 export default function CookieConsent() {
-  const [isVisible, setIsVisible] = useState(false);
   const { siteConfig } = useStore();
+  const [isVisible, setIsVisible] = useState(false);
   
-  const config = siteConfig?.cookieConsent;
+  const config = siteConfig.cookieConsent;
 
   useEffect(() => {
     if (!config?.enabled) return;
     
-    const consent = localStorage.getItem('splendour-cookie-consent');
+    // Check if user has already accepted/declined
+    const consent = localStorage.getItem('splendour_cookie_consent');
     if (!consent) {
-      const timer = setTimeout(() => setIsVisible(true), 1500);
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [config]);
+  }, [config?.enabled]);
 
-  const handleConsent = (accepted: boolean) => {
-    localStorage.setItem('splendour-cookie-consent', accepted ? 'accepted' : 'declined');
+  const handleAccept = () => {
+    localStorage.setItem('splendour_cookie_consent', 'accepted');
     setIsVisible(false);
   };
 
-  if (!config?.enabled) return null;
+  const handleDecline = () => {
+    localStorage.setItem('splendour_cookie_consent', 'declined');
+    setIsVisible(false);
+  };
+
+  if (!config?.enabled || !isVisible) return null;
 
   return (
     <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          className="fixed bottom-0 left-0 right-0 z-[150] p-4 md:p-6"
-        >
-          <div className="max-w-4xl mx-auto bg-brand-card/95 border border-white/10 backdrop-blur-xl rounded-[32px] p-6 md:p-8 shadow-2xl flex flex-col md:flex-row items-center gap-6 md:gap-10">
-            <div className="w-12 h-12 bg-brand-red/10 border border-brand-red/20 rounded-2xl flex items-center justify-center shrink-0">
-              <Shield className="text-brand-red" size={24} />
+      <motion.div
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 100, opacity: 0 }}
+        className="fixed bottom-8 left-8 right-8 z-[200] max-w-lg"
+      >
+        <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-[32px] p-8 shadow-2xl overflow-hidden relative">
+          {/* Radial Glow */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-red/20 blur-[80px]" />
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-brand-red/10 flex items-center justify-center text-brand-red">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-red mb-1">
+                  Security Protocol
+                </h3>
+                <h4 className="text-sm font-bold text-white uppercase tracking-widest">
+                  {config.title || 'Cookie Infrastructure'}
+                </h4>
+              </div>
             </div>
-            
-            <div className="flex-grow text-center md:text-left">
-              <h4 className="text-sm font-black uppercase tracking-[0.2em] mb-1">{config.title}</h4>
-              <p className="text-xs text-brand-muted leading-relaxed font-medium">
-                {config.message}
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <button
-                onClick={() => handleConsent(false)}
-                className="flex-grow md:flex-grow-0 px-6 py-3 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-widest text-brand-muted hover:text-white hover:bg-white/5 transition-all"
+
+            <p className="text-brand-muted text-[11px] leading-relaxed uppercase tracking-widest mb-8">
+              {config.message || 'We utilize architectural tracking fragments to ensure your interface synchronization is optimized for peak efficiency.'}
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={handleAccept}
+                className="bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-brand-red hover:text-white transition-all flex items-center justify-center gap-2"
               >
-                Decline
+                <Check size={14} />
+                {config.acceptText || 'Accept All'}
               </button>
-              <button
-                onClick={() => handleConsent(true)}
-                className="flex-grow md:flex-grow-0 px-8 py-3 rounded-xl bg-brand-red text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-accent-dark transition-all shadow-lg shadow-brand-red/20 flex items-center justify-center gap-2"
+              <button 
+                onClick={handleDecline}
+                className="bg-white/5 border border-white/10 text-brand-muted py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:text-white transition-all flex items-center justify-center gap-2"
               >
-                <Check size={14} /> {config.acceptText}
+                <X size={14} />
+                Decline
               </button>
             </div>
           </div>
-        </motion.div>
-      )}
+        </div>
+      </motion.div>
     </AnimatePresence>
   );
 }

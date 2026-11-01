@@ -13,6 +13,7 @@ import { Product } from '../types';
 import SEO from '../components/SEO';
 import { formatPrice } from '../constants';
 import { cn } from '../lib/utils';
+import { getProductFallbackImage, handleImageError } from '../lib/imageFallback';
 
 interface FilterBarProps {
   activeCategory: string;
@@ -24,42 +25,44 @@ interface FilterBarProps {
 
 function FilterBar({ activeCategory, setCategory, categories, sortBy, setSortBy }: FilterBarProps) {
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-white/40 mr-2">
+    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-12">
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center gap-2 text-white/40">
           <Filter size={16} />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Filter</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md">Catalog Protocol</span>
         </div>
-        <button 
-          onClick={() => setCategory('All')}
-          className={`px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${activeCategory === 'All' ? 'bg-brand-red border-brand-red text-white' : 'bg-transparent border-white/10 text-brand-muted hover:border-white/30'}`}
-        >
-          All
-        </button>
-        {categories.map(cat => (
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 -mx-6 px-6 lg:mx-0 lg:px-0 lg:flex-wrap">
           <button 
-            key={cat}
-            onClick={() => setCategory(cat)}
-            className={`px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${activeCategory === cat ? 'bg-brand-red border-brand-red text-white' : 'bg-transparent border-white/10 text-brand-muted hover:border-white/30'}`}
+            onClick={() => setCategory('All')}
+            className={`whitespace-nowrap px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === 'All' ? 'bg-brand-red border-brand-red text-white shadow-lg shadow-brand-red/20' : 'bg-white/5 border-white/10 text-brand-muted hover:border-white/30'}`}
           >
-            {cat}
+            All Archive
           </button>
-        ))}
+          {categories.map(cat => (
+            <button 
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`whitespace-nowrap px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeCategory === cat ? 'bg-brand-red border-brand-red text-white shadow-lg shadow-brand-red/20' : 'bg-white/5 border-white/10 text-brand-muted hover:border-white/30'}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-white/40">
+      <div className="flex items-center justify-between lg:justify-end gap-4 bg-white/5 p-2 rounded-2xl border border-white/5 lg:bg-transparent lg:p-0 lg:border-0">
+        <div className="flex items-center gap-2 text-white/40 px-4">
            <ArrowUpDown size={14} />
-           <span className="text-[10px] font-bold uppercase tracking-widest">Sort</span>
+           <span className="text-[10px] font-black uppercase tracking-widest">Sequence</span>
         </div>
         <select 
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-full px-6 py-2 text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:border-brand-red text-white transition-all appearance-none cursor-pointer hover:bg-white/10"
+          className="bg-brand-card border border-white/10 rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest focus:outline-none focus:border-brand-red text-white transition-all appearance-none cursor-pointer hover:bg-white/10 min-w-[160px]"
         >
-          <option value="newest" className="bg-brand-bg text-white">New Added</option>
-          <option value="price-low" className="bg-brand-bg text-white">Price: Low to High</option>
-          <option value="price-high" className="bg-brand-bg text-white">Price: High to Low</option>
+          <option value="newest" className="bg-brand-bg text-white">Latest Drops</option>
+          <option value="price-low" className="bg-brand-bg text-white">Price: Minimal</option>
+          <option value="price-high" className="bg-brand-bg text-white">Price: Premium</option>
         </select>
       </div>
     </div>
@@ -70,6 +73,12 @@ function ProductCard({ product }: { product: Product }) {
   const addToCart = useStore(state => state.addToCart);
   const navigate = useNavigate();
 
+  const productImage = (product.image && !product.image.includes('fbcdn.net'))
+    ? product.image
+    : (product.images?.[0] && !product.images[0].includes('fbcdn.net'))
+      ? product.images[0]
+      : getProductFallbackImage(product.name, product.category);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -77,22 +86,24 @@ function ProductCard({ product }: { product: Product }) {
       viewport={{ once: true }}
       className="group"
     >
-      <div className="relative aspect-[3/4] bg-brand-card rounded-2xl md:rounded-[32px] overflow-hidden border border-white/5 mb-4">
+      <div className="relative aspect-[3/4] bg-brand-card rounded-2xl md:rounded-[32px] overflow-hidden border border-white/5 mb-4 group">
         <img 
-          src={product.image} 
+          src={productImage} 
           alt={product.name} 
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 cursor-pointer"
+          className="w-full h-full object-cover transition-transform duration-700 md:group-hover:scale-110 cursor-pointer"
           onClick={() => navigate(`/product/${product.id}`)}
+          onError={(e) => handleImageError(e, getProductFallbackImage(product.name, product.category))}
           referrerPolicy="no-referrer"
         />
         {product.tag && (
-          <div className="absolute top-4 left-4 md:top-6 md:left-6">
-            <span className="bg-brand-red text-white text-[10px] font-bold uppercase tracking-widest py-1.5 px-3 rounded-full shadow-lg">
+          <div className="absolute top-3 left-3 md:top-6 md:left-6">
+            <span className="bg-brand-red text-white text-[8px] md:text-[10px] font-bold uppercase tracking-widest py-1 px-2 md:py-1.5 md:px-3 rounded-full shadow-lg">
               {product.tag}
             </span>
           </div>
         )}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm pointer-events-none group-hover:pointer-events-auto">
+        {/* Desktop Hover Overlay */}
+        <div className="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center backdrop-blur-sm pointer-events-none group-hover:pointer-events-auto">
           <div className="flex flex-col gap-2">
             <button 
               onClick={() => addToCart(product)}
@@ -108,22 +119,35 @@ function ProductCard({ product }: { product: Product }) {
             </button>
           </div>
         </div>
+        
+        {/* Mobile Quick Add */}
+        <div className="md:hidden absolute bottom-2 right-2">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              addToCart(product);
+            }}
+            className="w-10 h-10 bg-brand-red text-white rounded-xl flex items-center justify-center shadow-lg active:scale-95"
+          >
+            <ShoppingBag size={18} />
+          </button>
+        </div>
       </div>
-      <div>
+      <div className="px-1">
         <h3 
           onClick={() => navigate(`/product/${product.id}`)}
-          className="text-white font-bold mb-1 group-hover:text-brand-red transition-colors cursor-pointer"
+          className="text-white text-sm md:text-base font-bold mb-1 truncate group-hover:text-brand-red transition-colors cursor-pointer"
         >
           {product.name}
         </h3>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {product.discountPrice ? (
             <>
-              <p className="text-brand-red font-black font-mono text-sm">{formatPrice(product.discountPrice)}</p>
-              <p className="text-brand-muted font-medium font-mono text-[10px] line-through opacity-50">{formatPrice(product.price)}</p>
+              <p className="text-brand-red font-black font-mono text-xs md:text-sm">{formatPrice(product.discountPrice)}</p>
+              <p className="text-brand-muted font-medium font-mono text-[8px] md:text-[10px] line-through opacity-50">{formatPrice(product.price)}</p>
             </>
           ) : (
-            <p className="text-brand-muted font-mono text-sm">{formatPrice(product.price)}</p>
+            <p className="text-brand-muted font-mono text-xs md:text-sm">{formatPrice(product.price)}</p>
           )}
         </div>
       </div>
@@ -589,70 +613,105 @@ export default function InfoPage() {
       </div>
     ),
     'returns-exchanges': (
-    <div className="space-y-12">
-      <section className="space-y-6">
-        <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">Return Policy</h2>
-        <p>If you're not 100% satisfied with your purchase, we're here to help. At SPLENDOUR, we pride ourselves on quality, but we understand that sometimes things don't fit the vibe.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-6 bg-brand-card border border-white/5 rounded-2xl">
-            <h3 className="text-white font-bold mb-2">14-Day Window</h3>
-            <p className="text-sm">Items must be returned within 14 days of delivery. No exceptions for the culture.</p>
-          </div>
-          <div className="p-6 bg-brand-card border border-white/5 rounded-2xl">
-            <h3 className="text-white font-bold mb-2">Original State</h3>
-            <p className="text-sm">Products must be unworn, unwashed, and in their original packaging with all tags attached.</p>
-          </div>
-        </div>
-      </section>
-      <section className="space-y-6">
-        <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">How to Exchange</h2>
-        <p>Need a different size? We offer one-time free exchanges (within Bangladesh) to ensure you get that perfect oversized fit.</p>
-        <ul className="list-disc pl-6 space-y-3">
-          <li>Reach out to our support team via Instagram DM or Email.</li>
-          <li>Provide your order number and the reason for exchange.</li>
-          <li>Once approved, our courier will pick up the item and drop off the new one.</li>
-        </ul>
-      </section>
-    </div>
-  ),
-  'shipping-info': (
-    <div className="space-y-12">
-      <section className="space-y-8">
-        <div className="p-8 bg-brand-card border border-white/5 rounded-[32px] overflow-hidden relative">
-          <div className="relative z-10">
-            <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight mb-6">Domestic Shipping (Bangladesh)</h2>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                <span className="font-bold flex items-center gap-2 text-white"><MapPin size={18} className="text-brand-red" /> Inside Dhaka</span>
-                <span className="text-brand-red font-display font-bold">৳ 80.00</span>
-              </div>
-              <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                <span className="font-bold flex items-center gap-2 text-white"><Globe size={18} className="text-brand-red" /> Outside Dhaka</span>
-                <span className="text-brand-red font-display font-bold">৳ 140.00</span>
-              </div>
+      <div className="space-y-12">
+        <section className="space-y-6">
+          <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">Return Policy</h2>
+          <p>If you're not 100% satisfied with your purchase, we're here to help. At SPLENDOUR, we pride ourselves on quality, but we understand that sometimes things don't fit the vibe.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 bg-brand-card border border-white/5 rounded-2xl">
+              <h3 className="text-white font-bold mb-2">14-Day Window</h3>
+              <p className="text-sm">Items must be returned within 14 days of delivery. No exceptions for the culture.</p>
             </div>
-            <p className="text-sm mt-6 opacity-70">Delivery time: 2-3 business days within Dhaka, 3-5 days outside.</p>
+            <div className="p-6 bg-brand-card border border-white/5 rounded-2xl">
+              <h3 className="text-white font-bold mb-2">Pristine Condition</h3>
+              <p className="text-sm">Must be unworn, unwashed, and in the legendary original packaging with all tags attached.</p>
+            </div>
           </div>
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-             <Truck size={120} />
+          <div className="p-12 bg-white/5 border border-white/5 rounded-[48px] text-center">
+             <h3 className="text-xl font-bold text-white mb-4">BEGIN RETURN PROTOCOL</h3>
+             <p className="text-brand-muted mb-8 text-sm">Contact our support node with your order ID to receive a return authorization code.</p>
+             <a href={`mailto:${siteConfig.footer?.email || 'support@splendour.cc'}`} className="bg-brand-red text-white px-10 py-4 rounded-full font-bold inline-block hover:scale-105 transition-all uppercase tracking-widest text-xs">CONNECT WITH MAIN FRAME</a>
           </div>
+        </section>
+      </div>
+    ),
+    'shipping-info': (
+      <div className="space-y-12">
+        <section className="space-y-8">
+          <div className="max-w-2xl">
+             <h2 className="text-4xl font-display font-black text-white uppercase tracking-tighter mb-4">GLOBAL TRANSMITTAL</h2>
+             <p className="text-brand-muted">Architectural assets delivered from the Dhaka mainframe to your local coordinates. We synchronize with premium logistics nodes to ensure safe arrival.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+             <div className="p-8 bg-brand-card border border-white/5 rounded-[40px] space-y-4">
+                <div className="w-12 h-12 bg-brand-red/10 rounded-2xl flex items-center justify-center text-brand-red font-bold">
+                   ⚡
+                </div>
+                <h3 className="font-bold text-white uppercase tracking-widest text-[10px]">Standard Node</h3>
+                <p className="text-[10px] text-brand-muted leading-relaxed uppercase tracking-widest">3-5 Business Cycles. Reliable transmittal for essential acquisitions.</p>
+                <p className="text-brand-red font-mono font-bold text-sm">BDT 100.00</p>
+             </div>
+             <div className="p-8 bg-brand-card border border-white/5 rounded-[40px] space-y-4">
+                <div className="w-12 h-12 bg-brand-red/10 rounded-2xl flex items-center justify-center text-brand-red font-bold">
+                   ✨
+                </div>
+                <h3 className="font-bold text-white uppercase tracking-widest text-[10px]">Priority Node</h3>
+                <p className="text-[10px] text-brand-muted leading-relaxed uppercase tracking-widest">1-2 Business Cycles. Accelerated synchronization for urgent drops.</p>
+                <p className="text-brand-red font-mono font-bold text-sm">BDT 250.00</p>
+             </div>
+             <div className="p-8 bg-brand-card border border-white/5 rounded-[40px] space-y-4">
+                <div className="w-12 h-12 bg-brand-red/10 rounded-2xl flex items-center justify-center text-brand-red font-bold">
+                   🌐
+                </div>
+                <h3 className="font-bold text-white uppercase tracking-widest text-[10px]">Global Discovery</h3>
+                <p className="text-[10px] text-brand-muted leading-relaxed uppercase tracking-widest">7-14 Business Cycles. International coordinates beyond the local sector.</p>
+                <p className="text-brand-red font-mono font-bold text-sm">VARIES</p>
+             </div>
+          </div>
+        </section>
+      </div>
+    ),
+    'terms': (
+      <div className="max-w-3xl">
+        <h2 className="text-4xl font-display font-black text-white uppercase mb-12">Terms of Service</h2>
+        <div className="prose prose-invert prose-brand-red max-w-none space-y-12 text-brand-muted font-medium">
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">1. SYNCHRONIZATION DATA</h3>
+              <p>By interacting with the Splendour Movement platform, you harmonize with our digital protocols. All visual assets and architectural morphology are intellectual property of the Splendour Collective.</p>
+           </section>
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">2. ASSET ACQUISITION</h3>
+              <p>All acquisitions (orders) are subject to verification. We reserve the architectural right to decline any transaction that appears anomalous or violates our safety protocols.</p>
+           </section>
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">3. LIMITATION OF LIABILITY</h3>
+              <p>Splendour shall not be held liable for any indirect synchronization failures or consequential damage resulting from the use of our technical streetwear or our digital node (website).</p>
+           </section>
         </div>
-      </section>
-      <section className="space-y-6 p-8 border border-white/10 rounded-[32px] bg-gradient-to-br from-brand-card to-transparent">
-        <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">Worldwide Shipping</h2>
-        <p className="text-lg">We take the Splendour aesthetic global. International orders are handled exclusively by <span className="text-white font-bold">DHL Express</span>.</p>
-        <div className="p-6 bg-brand-red/10 border border-brand-red/20 rounded-2xl flex items-start gap-4">
-           <ShieldCheck className="text-brand-red shrink-0" size={24} />
-           <div>
-             <h4 className="text-brand-red font-bold mb-1 uppercase tracking-wider text-xs">Security Note</h4>
-             <p className="text-sm">For all international orders (DHL), we require <span className="text-white">full payment in advance</span>. Cash on delivery is not available for orders outside Bangladesh.</p>
-           </div>
+      </div>
+    ),
+    'privacy': (
+      <div className="max-w-3xl">
+        <h2 className="text-4xl font-display font-black text-white uppercase mb-12">Privacy Policy</h2>
+        <div className="prose prose-invert prose-brand-red max-w-none space-y-12 text-brand-muted font-medium">
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">1. IDENTITY HARVESTING</h3>
+              <p>We collect essential node identity data (Email, Phone, Physical Coordinates) solely for order synchronization and fulfillment. Your privacy is a core pillar of our architecture.</p>
+           </section>
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">2. DATA PROTECTION</h3>
+              <p>All transaction logs are encrypted with industry-standard protocols. Financial data is never processed directly on our mainframe; we use verified external security nodes.</p>
+           </section>
+           <section>
+              <h3 className="text-white text-xl uppercase font-bold tracking-widest mb-4">3. COOKIE SYSTEMS</h3>
+              <p>We utilize small tracking fragments (cookies) to optimize your interface journey. You can manage these fragments via your browser's local command center.</p>
+           </section>
         </div>
-      </section>
-    </div>
-  ),
-  'our-story': (
-    <div className="space-y-40">
+      </div>
+    ),
+    'our-story': (
+      <div className="space-y-40">
       {/* Cinematic Hero Video */}
       <motion.section 
         initial={{ opacity: 0 }}

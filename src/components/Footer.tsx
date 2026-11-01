@@ -36,13 +36,13 @@ export default function Footer() {
         const res = await fetch('/api/instagram');
         const data = await res.json();
         
-        if (res.ok && data.data) {
+        if (res.ok && data.data && data.data.length > 0) {
           setPosts(data.data.slice(0, 6));
         } else {
-          setError(data.message || 'Config Pending');
+          setError(data.message || 'Archive Mode Active');
         }
       } catch (err) {
-        setError('Network Error');
+        setError('Archive Mode Active');
       } finally {
         setLoading(false);
       }
@@ -67,7 +67,7 @@ export default function Footer() {
               {error && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
                   <AlertCircle size={12} className="text-brand-muted" />
-                  <span className="text-[9px] font-bold text-brand-muted uppercase tracking-widest">Connect API to Load Live Feed</span>
+                  <span className="text-[9px] font-bold text-brand-muted uppercase tracking-widest">Archive Collection Active</span>
                 </div>
               )}
               <a 
@@ -162,7 +162,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1">
             <Link to="/" className="text-2xl font-display font-black tracking-tighter text-white mb-6 block uppercase">
-              SPLENDOUR<span className="text-brand-red ml-0.5">.</span>
+              {siteConfig?.logoText || 'SPLENDOUR'}<span className="text-brand-red ml-0.5">.</span>
             </Link>
             <p className="text-brand-muted text-sm leading-relaxed mb-8">
               Splendour isn't just a brand; it's a statement. We believe in the power of the streets and the elegance of high fashion, creating architectural streetwear for the modern icon.
@@ -278,8 +278,8 @@ export default function Footer() {
             © 2026 SPLENDOUR ARCHITECTURAL STREETWEAR. ALL RIGHTS RESERVED.
           </p>
           <div className="flex space-x-6 text-[10px] font-black uppercase tracking-widest text-brand-muted">
-            <Link to="/info/terms-of-service" className="hover:text-white">Terms</Link>
-            <Link to="/info/privacy-policy" className="hover:text-white">Privacy</Link>
+            <Link to="/info/terms" className="hover:text-white">Terms</Link>
+            <Link to="/info/privacy" className="hover:text-white">Privacy</Link>
             <Link to="/info/cookies" className="hover:text-white">Cookies</Link>
           </div>
         </div>

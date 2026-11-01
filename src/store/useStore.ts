@@ -95,6 +95,7 @@ const initialProducts: Product[] = [
 ];
 
 const initialSiteConfig: SiteConfig = {
+  name: 'Splendour Architectural Streetwear',
   logoText: 'SPLENDOUR',
   navbarLinks: [
     { name: 'Home', href: '/' },
@@ -205,6 +206,10 @@ export const useStore = create<StoreState>()(
       updateMessageStatus: (id, status) => set((state) => ({
         messages: state.messages.map(m => m.id === id ? { ...m, status } : m)
       })),
+      subscribers: [],
+      setSubscribers: (subscribers) => set({ subscribers }),
+      traffic: [],
+      setTraffic: (traffic) => set({ traffic }),
       favorites: [],
       notifications: [],
       addNotification: (message, type = 'success') => set((state) => {
@@ -289,6 +294,10 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'splendour-storage',
+      partialize: (state) => ({
+        cart: state.cart,
+        favorites: state.favorites,
+      }),
     }
   )
 );

@@ -53,15 +53,24 @@ service cloud.firestore {
 
     function isValidOrder(o) {
       return o.id is string && o.id.size() <= 128 &&
-             o.userId is string && (o.userId == request.auth.uid || o.userId == 'guest') &&
+             o.userId is string && (o.userId == 'guest' || (isSignedIn() && o.userId == request.auth.uid)) &&
              o.customerEmail is string && o.customerEmail.size() > 0 &&
+             o.customerName is string && o.customerName.size() > 0 &&
+             o.customerPhone is string && o.customerPhone.size() > 0 &&
+             o.shippingAddress is string && o.shippingAddress.size() > 0 &&
+             o.items is list && o.items.size() > 0 && o.items.size() <= 100 &&
              o.total is number && o.total >= 0 &&
              o.deliveryCharge is number && o.deliveryCharge >= 0 &&
-             o.shippingRegion in ['INSIDE_DHAKA', 'OUTSIDE_DHAKA', 'INTERNATIONAL'] &&
+             o.shippingRegion is string &&
              o.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] &&
              o.paymentMethod in ['COD', 'bkash'] &&
-             o.items is list && o.items.size() > 0 && o.items.size() <= 100 &&
-             (!o.keys().contains('paymentDetails') || (o.paymentMethod == 'bkash' && o.paymentDetails is map));
+             (!o.keys().contains('paymentDetails') || o.paymentDetails == null || o.paymentDetails is map) &&
+             (!o.keys().contains('couponCode') || o.couponCode == null || o.couponCode is string) &&
+             (!o.keys().contains('couponDiscount') || o.couponDiscount is number) &&
+             (!o.keys().contains('subtotal') || o.subtotal is number) &&
+             (!o.keys().contains('invoiceId') || o.invoiceId is string) &&
+             (!o.keys().contains('billingAddress') || o.billingAddress is string) &&
+             (!o.keys().contains('createdAt') || o.createdAt is timestamp || o.createdAt is string);
     }
 
     function isValidReview(r) {
@@ -101,7 +110,26 @@ service cloud.firestore {
              (!m.keys().contains('createdAt') || m.createdAt is timestamp);
     }
 
+    function isValidSubscriber(s) {
+      return s.email is string && s.email.size() > 0 && s.email.size() <= 200 &&
+             s.status in ['active', 'unsubscribed'] &&
+             (!s.keys().contains('subscribedAt') || s.subscribedAt is timestamp);
+    }
+
+    function isValidCartActivity(ca) {
+      return ca.id is string && ca.id.size() <= 128 &&
+             ca.message is string && ca.message.size() > 0 && ca.message.size() <= 500 &&
+             ca.type in ['add', 'remove'] &&
+             (!ca.keys().contains('timestamp') || ca.timestamp is timestamp);
+    }
+
     // --- Collection Routes ---
+
+    match /cart_activity/{activityId} {
+      allow read: if true;
+      allow create: if isValidId(activityId) && isValidCartActivity(incoming()) && incoming().id == activityId;
+      allow update, delete: if isAdmin();
+    }
 
     match /products/{productId} {
       allow read: if true;
@@ -146,6 +174,16 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
       allow write: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      allow create: if isValidSubscriber(incoming());
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /traffic/{trafficId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
   }
 }
